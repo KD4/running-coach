@@ -10,7 +10,11 @@ enum class AuthProvider {
 @Entity
 @Table(
     name = "users",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["provider", "provider_user_id"])]
+    uniqueConstraints = [UniqueConstraint(columnNames = ["provider", "provider_user_id"])],
+    indexes = [
+        Index(name = "idx_user_session_token", columnList = "sessionToken"),
+        Index(name = "idx_user_email", columnList = "email"),
+    ]
 )
 class User(
     @Id

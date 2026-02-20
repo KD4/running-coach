@@ -9,6 +9,7 @@ const WORKOUT_COLORS: Record<string, string> = {
   LONG: '#2196F3',
   REST: '#9E9E9E',
   RACE: '#9C27B0',
+  PACE_RUN: '#00BCD4',
 };
 
 const WORKOUT_SHORT: Record<string, string> = {
@@ -18,6 +19,7 @@ const WORKOUT_SHORT: Record<string, string> = {
   LONG: '롱런',
   REST: '휴식',
   RACE: '레이스',
+  PACE_RUN: '페이스',
 };
 
 const DAY_HEADERS = ['일', '월', '화', '수', '목', '금', '토'];

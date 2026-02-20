@@ -103,70 +103,94 @@ class ScheduleService(
         val weekPlan = plan.find { it.weekNumber == currentWeek } ?: return null
         val paces = weekPlan.paces
 
-        if (todayDow == longRunDow) {
-            if (currentWeek == totalWeeks) {
-                return WorkoutDto(
-                    workoutType = "RACE",
-                    distanceKm = paceCalculator.raceDistanceKm(data.goalEvent),
-                    paceTarget = PaceCalculator.formatPace(paces.racePaceSec),
-                    description = "레이스 데이!",
-                )
-            }
+        // 레이스 데이 오버라이드
+        if (todayDow == longRunDow && currentWeek == totalWeeks) {
             return WorkoutDto(
-                workoutType = "LONG",
-                distanceKm = weekPlan.longRunKm,
-                paceTarget = PaceCalculator.formatPace(paces.longRunPaceSec),
-                description = "롱런 ${weekPlan.longRunKm}km",
+                workoutType = "RACE",
+                distanceKm = paceCalculator.raceDistanceKm(data.goalEvent),
+                paceTarget = PaceCalculator.formatPace(paces.racePaceSec),
+                description = "레이스 데이!",
             )
         }
 
-        val nonLongRunDays = trainingDaysList
-            .filter { toDayOfWeek(it) != longRunDow }
+        // 훈련일을 요일 순서로 정렬, 롱런은 마지막
+        val nonLongDays = trainingDaysList
             .map { toDayOfWeek(it) }
+            .filter { it != longRunDow }
+            .sortedBy { it.value }
+        val orderedDays = nonLongDays + longRunDow
 
-        val index = nonLongRunDays.indexOf(todayDow)
-        if (index < 0) return null
+        val position = orderedDays.indexOf(todayDow)
+        if (position < 0) return null
 
-        val slot = index % 3
-        return when (slot) {
-            0 -> WorkoutDto(
+        val pattern = getPattern(orderedDays.size, weekPlan.level)
+        if (position >= pattern.size) return null
+
+        return when (pattern[position]) {
+            "EASY" -> WorkoutDto(
                 workoutType = "EASY",
                 distanceKm = weekPlan.easyRunKm,
                 paceTarget = PaceCalculator.formatPace(paces.jogPaceSec),
                 description = "편한 페이스 조깅",
             )
-            1 -> {
-                // 같은 주 안에서 hard slot이 여러 번이면 TEMPO/INTERVAL 교대
-                val hardSlotOccurrence = (0..index).count { it % 3 == 1 } - 1
-                val isTempoFirst = currentWeek % 2 == 1
-                val isTempo = if (hardSlotOccurrence % 2 == 0) isTempoFirst else !isTempoFirst
-
-                if (isTempo) {
-                    val tempoWork = weekPlan.tempoRunKm - 3.0
-                    WorkoutDto(
-                        workoutType = "TEMPO",
-                        distanceKm = weekPlan.tempoRunKm,
-                        paceTarget = PaceCalculator.formatPace(paces.tempoPaceSec),
-                        description = "워밍업 2km + 템포 ${"%.1f".format(tempoWork)}km + 쿨다운 1km",
-                    )
-                } else {
-                    val intervalWork = weekPlan.intervalRunKm - 3.0
-                    WorkoutDto(
-                        workoutType = "INTERVAL",
-                        distanceKm = weekPlan.intervalRunKm,
-                        paceTarget = PaceCalculator.formatPace(paces.intervalPaceSec),
-                        description = "워밍업 2km + 인터벌 ${"%.1f".format(intervalWork)}km + 쿨다운 1km",
-                    )
-                }
+            "INTERVAL" -> {
+                val spec = weekPlan.intervalSpec!!
+                WorkoutDto(
+                    workoutType = "INTERVAL",
+                    distanceKm = weekPlan.intervalTotalKm,
+                    paceTarget = PaceCalculator.formatPace(paces.intervalPaceSec),
+                    description = "워밍업 2km + ${spec.description()} + 쿨다운 1km",
+                )
             }
-            2 -> WorkoutDto(
-                workoutType = "EASY",
-                distanceKm = weekPlan.easyRunKm,
-                paceTarget = PaceCalculator.formatPace(paces.jogPaceSec),
-                description = "회복 조깅",
+            "TEMPO" -> {
+                val tempoWork = weekPlan.tempoRunKm - 3.0
+                WorkoutDto(
+                    workoutType = "TEMPO",
+                    distanceKm = weekPlan.tempoRunKm,
+                    paceTarget = PaceCalculator.formatPace(paces.tempoPaceSec),
+                    description = "워밍업 2km + 템포 ${"%.1f".format(tempoWork)}km + 쿨다운 1km",
+                )
+            }
+            "PACE_RUN" -> WorkoutDto(
+                workoutType = "PACE_RUN",
+                distanceKm = weekPlan.paceRunKm,
+                paceTarget = PaceCalculator.formatPace(paces.paceRunPaceSec),
+                description = "페이스런 ${"%.1f".format(weekPlan.paceRunKm)}km",
+            )
+            "LONG" -> WorkoutDto(
+                workoutType = "LONG",
+                distanceKm = weekPlan.longRunKm,
+                paceTarget = PaceCalculator.formatPace(paces.longRunPaceSec),
+                description = "롱런 ${weekPlan.longRunKm}km",
             )
             else -> null
         }
+    }
+
+    // 주 훈련 횟수별 고정 패턴
+    private fun getPattern(dayCount: Int, level: PaceCalculator.Level): List<String> {
+        val clamped = dayCount.coerceIn(3, 6)
+        val base = if (level == PaceCalculator.Level.BEGINNER) {
+            when (clamped) {
+                3 -> listOf("EASY", "PACE_RUN", "LONG")
+                4 -> listOf("EASY", "PACE_RUN", "EASY", "LONG")
+                5 -> listOf("EASY", "PACE_RUN", "EASY", "PACE_RUN", "LONG")
+                6 -> listOf("EASY", "PACE_RUN", "EASY", "PACE_RUN", "EASY", "LONG")
+                else -> listOf("EASY", "PACE_RUN", "LONG")
+            }
+        } else {
+            when (clamped) {
+                3 -> listOf("EASY", "TEMPO", "LONG")
+                4 -> listOf("EASY", "INTERVAL", "EASY", "LONG")
+                5 -> listOf("EASY", "INTERVAL", "EASY", "TEMPO", "LONG")
+                6 -> listOf("EASY", "INTERVAL", "EASY", "TEMPO", "EASY", "LONG")
+                else -> listOf("EASY", "TEMPO", "LONG")
+            }
+        }
+        if (dayCount > 6) {
+            return List(dayCount - 6) { "EASY" } + base
+        }
+        return base
     }
 
     private fun calculateCalories(

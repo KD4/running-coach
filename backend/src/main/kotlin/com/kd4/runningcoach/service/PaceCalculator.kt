@@ -7,21 +7,41 @@ import kotlin.math.roundToInt
 @Component
 class PaceCalculator {
 
+    enum class Level { BEGINNER, INTERMEDIATE, ADVANCED }
+
     data class Paces(
         val racePaceSec: Int,
         val jogPaceSec: Int,
         val longRunPaceSec: Int,
         val tempoPaceSec: Int,
         val intervalPaceSec: Int,
+        val paceRunPaceSec: Int,
     )
+
+    data class IntervalSpec(
+        val intervalDistanceM: Int,
+        val reps: Int,
+        val recoveryDistanceM: Int,
+    ) {
+        fun totalKm(): Double {
+            val workM = intervalDistanceM * reps + recoveryDistanceM * (reps - 1)
+            return 2.0 + workM / 1000.0 + 1.0
+        }
+
+        fun description(): String =
+            "${intervalDistanceM}m × ${reps}개, 세트 간 ${recoveryDistanceM}m 회복 조깅"
+    }
 
     data class WeeklyPlan(
         val weekNumber: Int,
         val paces: Paces,
+        val level: Level,
         val longRunKm: Double,
         val easyRunKm: Double,
         val tempoRunKm: Double,
-        val intervalRunKm: Double,
+        val paceRunKm: Double,
+        val intervalSpec: IntervalSpec?,
+        val intervalTotalKm: Double,
     )
 
     fun raceDistanceKm(goalEvent: String): Double = when (goalEvent) {
@@ -38,6 +58,12 @@ class PaceCalculator {
         else -> 12
     }
 
+    fun determineLevel(racePaceSec: Int): Level = when {
+        racePaceSec >= 540 -> Level.BEGINNER
+        racePaceSec < 390 -> Level.ADVANCED
+        else -> Level.INTERMEDIATE
+    }
+
     fun calculatePaces(goalTimeSeconds: Int, goalEvent: String): Paces {
         val mp = goalTimeSeconds.toDouble() / raceDistanceKm(goalEvent)
         return Paces(
@@ -46,33 +72,74 @@ class PaceCalculator {
             longRunPaceSec = (mp + 52).roundToInt(),
             tempoPaceSec = (mp - 12).roundToInt(),
             intervalPaceSec = (mp - 25).roundToInt(),
+            paceRunPaceSec = (mp + 15).roundToInt(),
         )
     }
 
     fun generatePlan(goalTimeSeconds: Int, goalEvent: String, totalWeeks: Int): List<WeeklyPlan> {
         val paces = calculatePaces(goalTimeSeconds, goalEvent)
-        val beginnerRatio = if (paces.racePaceSec >= 540) 0.9 else 1.0
+        val level = determineLevel(paces.racePaceSec)
 
         return (1..totalWeeks).map { week ->
             val isTaper = week > totalWeeks - 2
             val taperRatio = if (isTaper) 0.5 else 1.0
-            val ratio = taperRatio * beginnerRatio
+
+            val distanceRatio = when (level) {
+                Level.BEGINNER -> 0.7
+                Level.INTERMEDIATE -> 1.0
+                Level.ADVANCED -> 1.0
+            } * taperRatio
+
+            val longRunRatio = when (level) {
+                Level.BEGINNER -> 0.7
+                Level.INTERMEDIATE -> 1.0
+                Level.ADVANCED -> 1.1
+            }
+
+            val spec = if (level == Level.BEGINNER) null
+                       else getIntervalSpec(week, totalWeeks, level)
 
             WeeklyPlan(
                 weekNumber = week,
                 paces = paces,
-                longRunKm = round1(longRunKm(goalEvent, week, totalWeeks) * beginnerRatio),
-                easyRunKm = round1(easyRunKm(goalEvent, week) * ratio),
-                tempoRunKm = round1(tempoRunKm(goalEvent, week) * ratio),
-                intervalRunKm = round1(intervalRunKm(goalEvent, week) * ratio),
+                level = level,
+                longRunKm = round1(longRunKm(goalEvent, week, totalWeeks) * longRunRatio),
+                easyRunKm = round1(easyRunKm(goalEvent, week) * distanceRatio),
+                tempoRunKm = round1(tempoRunKm(goalEvent, week) * distanceRatio),
+                paceRunKm = round1(tempoRunKm(goalEvent, week) * distanceRatio),
+                intervalSpec = spec,
+                intervalTotalKm = if (spec != null) round1(spec.totalKm()) else 0.0,
             )
         }
     }
 
+    fun getIntervalSpec(week: Int, totalWeeks: Int, level: Level): IntervalSpec {
+        val isTaper = week > totalWeeks - 2
+        if (isTaper) {
+            return when (level) {
+                Level.ADVANCED -> IntervalSpec(400, 5, 130)
+                else -> IntervalSpec(400, 4, 200)
+            }
+        }
+
+        return when (level) {
+            Level.INTERMEDIATE -> when {
+                week <= 4 -> IntervalSpec(400, 8, 200)
+                week <= 8 -> IntervalSpec(800, 6, 400)
+                week <= 12 -> IntervalSpec(1000, 5, 400)
+                else -> IntervalSpec(1600, 4, 600)
+            }
+            Level.ADVANCED -> when {
+                week <= 4 -> IntervalSpec(800, (8 * 1.2).roundToInt(), 300)
+                week <= 8 -> IntervalSpec(1000, (6 * 1.2).roundToInt(), 300)
+                week <= 12 -> IntervalSpec(1600, (5 * 1.2).roundToInt(), 500)
+                else -> IntervalSpec(1600, (4 * 1.2).roundToInt(), 500)
+            }
+            else -> IntervalSpec(400, 4, 200)
+        }
+    }
+
     // --- Long Run Distance ---
-    // Marathon: 16km start, +2km/week, max 32km, last 2 weeks taper 50%
-    // Half:    10km start, +1.5km/week, max 21km
-    // 10K:     6km start, +0.5km/week, max 12km
     private fun longRunKm(goalEvent: String, week: Int, totalWeeks: Int): Double {
         val (start, step, cap) = when (goalEvent) {
             "10K" -> Triple(6.0, 0.5, 12.0)
@@ -105,19 +172,7 @@ class PaceCalculator {
             else -> Triple(5.0, 0.5, 10.0)
         }
         val tempoWork = min(base + (week - 1) * step, cap)
-        return 2.0 + tempoWork + 1.0  // warmup + work + cooldown
-    }
-
-    // --- Interval Run Distance (warmup 2km + interval work + cooldown 1km) ---
-    private fun intervalRunKm(goalEvent: String, week: Int): Double {
-        val (base, step, cap) = when (goalEvent) {
-            "10K" -> Triple(2.0, 0.3, 5.0)
-            "HALF" -> Triple(3.0, 0.4, 6.0)
-            "MARATHON" -> Triple(4.0, 0.4, 8.0)
-            else -> Triple(4.0, 0.4, 8.0)
-        }
-        val intervalWork = min(base + (week - 1) * step, cap)
-        return 2.0 + intervalWork + 1.0
+        return 2.0 + tempoWork + 1.0
     }
 
     private fun round1(v: Double): Double = (v * 10).roundToInt() / 10.0
