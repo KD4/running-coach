@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID || '598ecd287837c2a65ec66f56cf8863f8';
+const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
 const KAKAO_REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI || 'http://localhost:5173/auth/kakao/callback';
 
 export default function Login() {
