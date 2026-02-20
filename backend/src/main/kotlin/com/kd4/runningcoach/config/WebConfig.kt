@@ -12,7 +12,7 @@ class WebConfig(
 
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/api/**")
-            .allowedOrigins("http://localhost:5173", "https://kd4-8438.vercel.app")
+            .allowedOrigins("http://localhost:5173", "https://running-coach-ebon.vercel.app", "http://running-coach-ebon.vercel.app")
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .allowCredentials(true)
