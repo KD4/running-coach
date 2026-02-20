@@ -14,3 +14,14 @@ spring:
 
 server:
   port: 8080
+
+oauth:
+  kakao:
+    client-id: 598ecd287837c2a65ec66f56cf8863f8
+    redirect-uri: http://localhost:5173/auth/kakao/callback
+  # toss:
+  #   client-id: YOUR_TOSS_CLIENT_ID
+  #   client-secret: YOUR_TOSS_CLIENT_SECRET
+  #   redirect-uri: http://localhost:5173/auth/toss/callback
+  #   token-uri: https://oauth2.toss.im/token
+  #   user-info-uri: https://oauth2.toss.im/me

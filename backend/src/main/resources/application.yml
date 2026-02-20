@@ -14,3 +14,8 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+oauth:
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID}
+    redirect-uri: ${KAKAO_REDIRECT_URI}
