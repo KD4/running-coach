@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { oauthLogin } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,8 +12,12 @@ export default function OAuthCallback({ provider }: Props) {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const called = useRef(false);
 
   useEffect(() => {
+    if (called.current) return;
+    called.current = true;
+
     const code = searchParams.get('code');
     if (!code) {
       setError('인증 코드가 없습니다.');
