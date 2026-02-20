@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate
 @Component
 class KakaoOAuthClient(
     @Value("\${oauth.kakao.client-id}") private val clientId: String,
+    @Value("\${oauth.kakao.client-secret}") private val clientSecret: String,
     @Value("\${oauth.kakao.redirect-uri}") private val redirectUri: String,
 ) : OAuthClient {
 
@@ -28,6 +29,7 @@ class KakaoOAuthClient(
         val body = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "authorization_code")
             add("client_id", clientId)
+            add("client_secret", clientSecret)
             add("redirect_uri", redirectUri)
             add("code", code)
         }
