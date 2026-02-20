@@ -3,7 +3,12 @@ package com.kd4.runningcoach.entity
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "training_templates")
+@Table(
+    name = "training_templates",
+    indexes = [
+        Index(name = "idx_template_event_week", columnList = "goalEvent, weekNumber"),
+    ]
+)
 class TrainingTemplate(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
