@@ -236,14 +236,14 @@ class ScheduleService(
         val typeToday = workoutTypeToday ?: "REST"
 
         val intensityBonus = when (typeToday) {
-            "REST" -> 200
-            "ACTIVE_RECOVERY" -> trainingBurn + 100
-            "EASY", "AR" -> trainingBurn + 100
-            "TEMPO", "PACE_RUN" -> trainingBurn + 200
-            "INTERVAL" -> trainingBurn + 300
-            "LONG" -> trainingBurn + 400
-            "RACE" -> trainingBurn + 500
-            else -> trainingBurn + 100
+            "REST" -> 0
+            "ACTIVE_RECOVERY" -> trainingBurn
+            "EASY", "AR" -> trainingBurn
+            "TEMPO", "PACE_RUN" -> trainingBurn
+            "INTERVAL" -> trainingBurn
+            "LONG" -> trainingBurn
+            "RACE" -> trainingBurn
+            else -> trainingBurn
         }
 
         val typeTomorrow = workoutTypeTomorrow ?: "REST"
