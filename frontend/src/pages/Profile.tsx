@@ -75,7 +75,13 @@ export default function Profile() {
         setProfile(p);
         fillForm(p);
       })
-      .catch(() => setError('프로필을 불러오지 못했습니다.'))
+      .catch((err) => {
+        if (err?.response?.status === 404) {
+          setError('프로필이 아직 설정되지 않았습니다. 온보딩을 완료해주세요.');
+        } else {
+          setError('프로필을 불러오지 못했습니다.');
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 

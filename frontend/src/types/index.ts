@@ -8,12 +8,15 @@ export interface WorkoutDto {
 export interface CaloriesDto {
   bmr: number;
   trainingBurn: number;
+  intensityBonus: number;
   tomorrowPrep: number;
   dailyDeficit: number;
   totalRecommended: number;
   targetWeight: number | null;
   weightToLose: number;
   dietDaysRemaining: number;
+  tomorrowWorkoutType: string | null;
+  carbLoadingRecommended: boolean;
 }
 
 export interface TodayResponse {

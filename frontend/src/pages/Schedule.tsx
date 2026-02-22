@@ -4,22 +4,26 @@ import type { MonthlyScheduleResponse, ScheduleDayDto } from '../types';
 
 const WORKOUT_COLORS: Record<string, string> = {
   EASY: '#4CAF50',
+  AR: '#66BB6A',
   TEMPO: '#FF9800',
   INTERVAL: '#F44336',
   LONG: '#2196F3',
   REST: '#9E9E9E',
   RACE: '#9C27B0',
   PACE_RUN: '#00BCD4',
+  ACTIVE_RECOVERY: '#78909C',
 };
 
 const WORKOUT_SHORT: Record<string, string> = {
   EASY: '이지',
+  AR: 'AR',
   TEMPO: '템포',
   INTERVAL: '인터벌',
   LONG: '롱런',
   REST: '휴식',
   RACE: '레이스',
   PACE_RUN: '페이스',
+  ACTIVE_RECOVERY: '회복',
 };
 
 const DAY_HEADERS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -41,7 +45,13 @@ export default function Schedule() {
         setData(d);
         setSelected(null);
       })
-      .catch(() => setError('스케줄을 불러오지 못했습니다.'))
+      .catch((err) => {
+        if (err?.response?.status === 404) {
+          setError('프로필 설정이 필요합니다. 프로필 페이지에서 설정해주세요.');
+        } else {
+          setError('스케줄을 불러오지 못했습니다.');
+        }
+      })
       .finally(() => setLoading(false));
   }, [year, month]);
 

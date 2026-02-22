@@ -21,12 +21,15 @@ data class WorkoutDto(
 data class CaloriesDto(
     val bmr: Int,
     val trainingBurn: Int,
+    val intensityBonus: Int,
     val tomorrowPrep: Int,
     val dailyDeficit: Int,
     val totalRecommended: Int,
     val targetWeight: Double?,
     val weightToLose: Double,
     val dietDaysRemaining: Int,
+    val tomorrowWorkoutType: String?,
+    val carbLoadingRecommended: Boolean,
 )
 
 data class MonthlyScheduleResponse(

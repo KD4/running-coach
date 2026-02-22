@@ -456,10 +456,75 @@ body {
   transform: rotate(180deg);
 }
 
+.diet-header-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.diet-header-row .diet-toggle-btn {
+  flex: 1;
+  margin-top: 0;
+}
+
+.diet-tip-trigger {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.diet-tip-bubble {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 260px;
+  background: var(--text);
+  color: white;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.diet-tip-bubble p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
 .calories-diet-section {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px dashed var(--border, #e0e0e0);
+}
+
+/* === Carb Loading Banner === */
+.carb-loading-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFF3E0;
+  border: 1px solid #FFB74D;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+}
+
+.carb-loading-banner p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #E65100;
 }
 
 /* === Schedule Page === */

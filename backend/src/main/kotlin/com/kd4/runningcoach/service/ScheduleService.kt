@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 
 @Service
 class ScheduleService(
@@ -41,11 +42,17 @@ class ScheduleService(
         val workout = getWorkoutForDate(data, date, currentWeek, totalWeeks, plan)
 
         val distanceToday = workout?.distanceKm ?: 0.0
+        val workoutTypeToday = workout?.workoutType
         val tomorrowWeek = calculateCurrentWeek(data.targetDate, totalWeeks, date.plusDays(1))
         val tomorrowWorkout = getWorkoutForDate(data, date.plusDays(1), tomorrowWeek, totalWeeks, plan)
         val distanceTomorrow = tomorrowWorkout?.distanceKm ?: 0.0
+        val workoutTypeTomorrow = tomorrowWorkout?.workoutType
 
-        val calories = calculateCalories(data.bodyWeight, distanceToday, distanceTomorrow, data.targetWeight, data.targetDate, date)
+        val calories = calculateCalories(
+            data.bodyWeight, distanceToday, workoutTypeToday,
+            distanceTomorrow, workoutTypeTomorrow,
+            data.targetWeight, data.targetDate, date
+        )
 
         return TodayResponse(
             date = date,
@@ -99,6 +106,7 @@ class ScheduleService(
 
         if (todayDow !in trainingDows) return null
         if (currentWeek < 1 || currentWeek > totalWeeks) return null
+        if (date.isAfter(data.targetDate)) return null
 
         val weekPlan = plan.find { it.weekNumber == currentWeek } ?: return null
         val paces = weekPlan.paces
@@ -133,6 +141,21 @@ class ScheduleService(
                 paceTarget = PaceCalculator.formatPace(paces.jogPaceSec),
                 description = "편한 페이스 조깅",
             )
+            "AR" -> WorkoutDto(
+                workoutType = "AR",
+                distanceKm = weekPlan.arRunKm,
+                paceTarget = PaceCalculator.formatPace(paces.arPaceSec),
+                description = "에어로빅 런 ${"%.1f".format(weekPlan.arRunKm)}km - 대화 가능한 편안한 페이스",
+            )
+            "ACTIVE_RECOVERY" -> {
+                val recoveryKm = (weekPlan.easyRunKm * 0.6 * 10).roundToInt() / 10.0
+                WorkoutDto(
+                    workoutType = "ACTIVE_RECOVERY",
+                    distanceKm = recoveryKm,
+                    paceTarget = PaceCalculator.formatPace(paces.jogPaceSec),
+                    description = "회복 조깅 ${recoveryKm}km - 가볍게 풀어주기",
+                )
+            }
             "INTERVAL" -> {
                 val spec = weekPlan.intervalSpec!!
                 WorkoutDto(
@@ -167,24 +190,29 @@ class ScheduleService(
         }
     }
 
-    // 주 훈련 횟수별 고정 패턴
     private fun getPattern(dayCount: Int, level: PaceCalculator.Level): List<String> {
         val clamped = dayCount.coerceIn(3, 6)
-        val base = if (level == PaceCalculator.Level.BEGINNER) {
-            when (clamped) {
-                3 -> listOf("EASY", "PACE_RUN", "LONG")
-                4 -> listOf("EASY", "PACE_RUN", "EASY", "LONG")
-                5 -> listOf("EASY", "PACE_RUN", "EASY", "PACE_RUN", "LONG")
-                6 -> listOf("EASY", "PACE_RUN", "EASY", "PACE_RUN", "EASY", "LONG")
-                else -> listOf("EASY", "PACE_RUN", "LONG")
+        val base = when (level) {
+            PaceCalculator.Level.BEGINNER -> when (clamped) {
+                3 -> listOf("EASY", "AR", "LONG")
+                4 -> listOf("AR", "EASY", "AR", "LONG")
+                5 -> listOf("AR", "EASY", "AR", "EASY", "LONG")
+                6 -> listOf("AR", "EASY", "AR", "EASY", "EASY", "LONG")
+                else -> listOf("EASY", "AR", "LONG")
             }
-        } else {
-            when (clamped) {
-                3 -> listOf("EASY", "TEMPO", "LONG")
-                4 -> listOf("EASY", "INTERVAL", "EASY", "LONG")
-                5 -> listOf("EASY", "INTERVAL", "EASY", "TEMPO", "LONG")
-                6 -> listOf("EASY", "INTERVAL", "EASY", "TEMPO", "EASY", "LONG")
-                else -> listOf("EASY", "TEMPO", "LONG")
+            PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
+                3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
+                5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                6 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                else -> listOf("INTERVAL", "TEMPO", "LONG")
+            }
+            PaceCalculator.Level.ADVANCED -> when (clamped) {
+                3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                4 -> listOf("INTERVAL", "EASY", "TEMPO", "LONG")
+                5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                6 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                else -> listOf("INTERVAL", "TEMPO", "LONG")
             }
         }
         if (dayCount > 6) {
@@ -196,19 +224,39 @@ class ScheduleService(
     private fun calculateCalories(
         bodyWeight: Double,
         distanceToday: Double,
+        workoutTypeToday: String?,
         distanceTomorrow: Double,
+        workoutTypeTomorrow: String?,
         targetWeight: Double?,
         targetDate: LocalDate,
         today: LocalDate,
     ): CaloriesDto {
         val bmr = (bodyWeight * 24).toInt()
         val trainingBurn = (distanceToday * bodyWeight * 1.0).toInt()
-        val tomorrowPrep = (distanceTomorrow * bodyWeight * 1.0 * 0.5).toInt()
-        val baseCalories = bmr + trainingBurn + tomorrowPrep
+        val typeToday = workoutTypeToday ?: "REST"
 
-        val dailyDeficit: Int
+        val intensityBonus = when (typeToday) {
+            "REST" -> 200
+            "ACTIVE_RECOVERY" -> trainingBurn + 100
+            "EASY", "AR" -> trainingBurn + 100
+            "TEMPO", "PACE_RUN" -> trainingBurn + 200
+            "INTERVAL" -> trainingBurn + 300
+            "LONG" -> trainingBurn + 400
+            "RACE" -> trainingBurn + 500
+            else -> trainingBurn + 100
+        }
+
+        val typeTomorrow = workoutTypeTomorrow ?: "REST"
+        val isHighIntensityTomorrow = typeTomorrow in listOf("INTERVAL", "LONG")
+        val carbLoadingRecommended = isHighIntensityTomorrow
+
+        val tomorrowPrep = if (isHighIntensityTomorrow) {
+            (distanceTomorrow * bodyWeight * 0.3 + 200).toInt()
+        } else 0
+
         val weightToLose: Double
         val dietDaysRemaining: Int
+        val dailyDeficit: Int
 
         if (targetWeight == null || bodyWeight <= targetWeight) {
             dailyDeficit = 0
@@ -218,23 +266,28 @@ class ScheduleService(
             val dietEndDate = targetDate.minusDays(7)
             val days = ChronoUnit.DAYS.between(today, dietEndDate).toInt().coerceAtLeast(0)
             weightToLose = bodyWeight - targetWeight
-            val totalDeficit = (weightToLose * 7700).toInt()
-            val rawDeficit = if (days > 0) totalDeficit / days else 0
-            dailyDeficit = rawDeficit.coerceAtMost(trainingBurn + tomorrowPrep)
+            val totalDeficitCal = (weightToLose * 7700).toInt()
+            val rawDeficit = if (days > 0) totalDeficitCal / days else 0
+
+            val noDeficitToday = typeToday == "INTERVAL" || isHighIntensityTomorrow
+            dailyDeficit = if (noDeficitToday) 0 else rawDeficit.coerceAtMost(500)
             dietDaysRemaining = days
         }
 
-        val totalRecommended = baseCalories - dailyDeficit
+        val totalRecommended = bmr + intensityBonus + tomorrowPrep - dailyDeficit
 
         return CaloriesDto(
             bmr = bmr,
             trainingBurn = trainingBurn,
+            intensityBonus = intensityBonus,
             tomorrowPrep = tomorrowPrep,
             dailyDeficit = dailyDeficit,
             totalRecommended = totalRecommended,
             targetWeight = targetWeight,
             weightToLose = weightToLose,
             dietDaysRemaining = dietDaysRemaining,
+            tomorrowWorkoutType = workoutTypeTomorrow,
+            carbLoadingRecommended = carbLoadingRecommended,
         )
     }
 

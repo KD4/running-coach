@@ -16,6 +16,7 @@ class PaceCalculator {
         val tempoPaceSec: Int,
         val intervalPaceSec: Int,
         val paceRunPaceSec: Int,
+        val arPaceSec: Int,
     )
 
     data class IntervalSpec(
@@ -40,8 +41,11 @@ class PaceCalculator {
         val easyRunKm: Double,
         val tempoRunKm: Double,
         val paceRunKm: Double,
+        val arRunKm: Double,
         val intervalSpec: IntervalSpec?,
         val intervalTotalKm: Double,
+        val blockPosition: Int,
+        val volumeMultiplier: Double,
     )
 
     fun raceDistanceKm(goalEvent: String): Double = when (goalEvent) {
@@ -73,6 +77,7 @@ class PaceCalculator {
             tempoPaceSec = (mp - 12).roundToInt(),
             intervalPaceSec = (mp - 25).roundToInt(),
             paceRunPaceSec = (mp + 15).roundToInt(),
+            arPaceSec = (mp + 62).roundToInt(),
         )
     }
 
@@ -82,13 +87,26 @@ class PaceCalculator {
 
         return (1..totalWeeks).map { week ->
             val isTaper = week > totalWeeks - 2
-            val taperRatio = if (isTaper) 0.5 else 1.0
+            val blockPosition = ((week - 1) % 4) + 1
+            val blockNumber = (week - 1) / 4
 
-            val distanceRatio = when (level) {
+            val positionMultiplier = when (blockPosition) {
+                1 -> 0.8   // 적응
+                2 -> 1.0   // 발전
+                3 -> 1.1   // 강화
+                4 -> 0.7   // 회복
+                else -> 1.0
+            }
+            val blockBaseMultiplier = 1.0 + blockNumber * 0.05
+
+            val volumeMultiplier = if (isTaper) 0.5
+                                   else positionMultiplier * blockBaseMultiplier
+
+            val levelRatio = when (level) {
                 Level.BEGINNER -> 0.7
                 Level.INTERMEDIATE -> 1.0
                 Level.ADVANCED -> 1.0
-            } * taperRatio
+            }
 
             val longRunRatio = when (level) {
                 Level.BEGINNER -> 0.7
@@ -99,16 +117,21 @@ class PaceCalculator {
             val spec = if (level == Level.BEGINNER) null
                        else getIntervalSpec(week, totalWeeks, level)
 
+            val baseEasyKm = easyRunKm(goalEvent, week)
+
             WeeklyPlan(
                 weekNumber = week,
                 paces = paces,
                 level = level,
-                longRunKm = round1(longRunKm(goalEvent, week, totalWeeks) * longRunRatio),
-                easyRunKm = round1(easyRunKm(goalEvent, week) * distanceRatio),
-                tempoRunKm = round1(tempoRunKm(goalEvent, week) * distanceRatio),
-                paceRunKm = round1(tempoRunKm(goalEvent, week) * distanceRatio),
+                longRunKm = round1(longRunKm(goalEvent, week, totalWeeks) * longRunRatio * volumeMultiplier),
+                easyRunKm = round1(baseEasyKm * levelRatio * volumeMultiplier),
+                tempoRunKm = round1(tempoRunKm(goalEvent, week) * levelRatio * volumeMultiplier),
+                paceRunKm = round1(tempoRunKm(goalEvent, week) * levelRatio * volumeMultiplier),
+                arRunKm = round1(baseEasyKm * 1.2 * levelRatio * volumeMultiplier),
                 intervalSpec = spec,
                 intervalTotalKm = if (spec != null) round1(spec.totalKm()) else 0.0,
+                blockPosition = blockPosition,
+                volumeMultiplier = round1(volumeMultiplier),
             )
         }
     }
@@ -139,7 +162,7 @@ class PaceCalculator {
         }
     }
 
-    // --- Long Run Distance ---
+    // --- Long Run Distance (taper handled by volumeMultiplier externally) ---
     private fun longRunKm(goalEvent: String, week: Int, totalWeeks: Int): Double {
         val (start, step, cap) = when (goalEvent) {
             "10K" -> Triple(6.0, 0.5, 12.0)
@@ -147,9 +170,7 @@ class PaceCalculator {
             "MARATHON" -> Triple(16.0, 2.0, 32.0)
             else -> Triple(16.0, 2.0, 32.0)
         }
-        val base = min(start + (week - 1) * step, cap)
-        val isTaper = week > totalWeeks - 2
-        return round1(if (isTaper) base * 0.5 else base)
+        return min(start + (week - 1) * step, cap)
     }
 
     // --- Easy Run Distance ---
