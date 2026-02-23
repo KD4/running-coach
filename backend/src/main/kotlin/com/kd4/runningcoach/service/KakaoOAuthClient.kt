@@ -13,6 +13,7 @@ import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty("oauth.kakao.enabled", havingValue = "true", matchIfMissing = false)
 class KakaoOAuthClient(
     @Value("\${oauth.kakao.client-id}") private val clientId: String,
     @Value("\${oauth.kakao.client-secret}") private val clientSecret: String,
@@ -23,7 +24,7 @@ class KakaoOAuthClient(
     override val provider = AuthProvider.KAKAO
     private val restTemplate = RestTemplate()
 
-    override fun exchangeCode(code: String): String {
+    override fun exchangeCode(code: String, referrer: String?): String {
         log.info("Kakao token exchange: redirect_uri={}, client_id={}...", redirectUri, clientId.take(8))
         val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_FORM_URLENCODED }
         val body = LinkedMultiValueMap<String, String>().apply {

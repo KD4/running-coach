@@ -12,8 +12,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/auth/kakao/callback" element={<OAuthCallback provider="kakao" />} />
-      <Route path="/auth/toss/callback" element={<OAuthCallback provider="toss" />} />
+      <Route path="/auth/toss/callback" element={<OAuthCallback />} />
       <Route path="/onboarding" element={<Onboarding />} />
 
       <Route element={<ProtectedRoute />}>

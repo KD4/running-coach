@@ -2,35 +2,26 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitOnboarding } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
-
-const DAYS = [
-  { value: 'MON', label: '월' },
-  { value: 'TUE', label: '화' },
-  { value: 'WED', label: '수' },
-  { value: 'THU', label: '목' },
-  { value: 'FRI', label: '금' },
-  { value: 'SAT', label: '토' },
-  { value: 'SUN', label: '일' },
-];
-
-const EVENTS = [
-  { value: '10K', label: '10K' },
-  { value: 'HALF', label: '하프 마라톤' },
-  { value: 'MARATHON', label: '풀 마라톤' },
-];
+import { Button, Paragraph, Spacing, TextField, Top } from '@toss/tds-mobile';
+import { css } from '@emotion/react';
+import { DAYS, EVENTS } from '../constants/workout';
+import { spacing } from '../styles/tokens';
+import { pageStyle, formSectionStyle, dateInputStyle, timeInputsRowStyle, timeFieldStyle, timeInputWidthStyle } from '../styles/common';
+import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const { isGuest, setOnboarded, setGuestProfile } = useAuth();
   const [goalEvent, setGoalEvent] = useState('10K');
-  const [goalHours, setGoalHours] = useState(0);
-  const [goalMinutes, setGoalMinutes] = useState(50);
-  const [goalSeconds, setGoalSeconds] = useState(0);
+  const [goalHours, setGoalHours] = useState('0');
+  const [goalMinutes, setGoalMinutes] = useState('50');
+  const [goalSeconds, setGoalSeconds] = useState('0');
   const [targetDate, setTargetDate] = useState('');
   const [trainingDays, setTrainingDays] = useState<string[]>(['TUE', 'THU', 'SAT']);
   const [longRunDay, setLongRunDay] = useState('SAT');
-  const [bodyWeight, setBodyWeight] = useState(70);
-  const [targetWeight, setTargetWeight] = useState<string>('');
+  const [bodyWeight, setBodyWeight] = useState('70');
+  const [targetWeight, setTargetWeight] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,11 +50,11 @@ export default function Onboarding() {
 
     const profileData = {
       goalEvent,
-      goalTimeSeconds: goalHours * 3600 + goalMinutes * 60 + goalSeconds,
+      goalTimeSeconds: Number(goalHours) * 3600 + Number(goalMinutes) * 60 + Number(goalSeconds),
       targetDate,
       trainingDays,
       longRunDay,
-      bodyWeight,
+      bodyWeight: Number(bodyWeight),
       targetWeight: targetWeight ? Number(targetWeight) : null,
     };
 
@@ -87,115 +78,174 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="page onboarding-page">
-      <h1>훈련 프로필 설정</h1>
-      <p className="page-subtitle">맞춤 훈련 플랜을 위한 정보를 입력해주세요</p>
+    <div css={onboardingPageStyle}>
+      <Top
+        upperGap={8}
+        lowerGap={spacing.xxl}
+        title={<Top.TitleParagraph>훈련 프로필 설정</Top.TitleParagraph>}
+        subtitleBottom={
+          <Top.SubtitleParagraph>
+            맞춤 훈련 플랜을 위한 정보를 입력해주세요
+          </Top.SubtitleParagraph>
+        }
+      />
 
-      <form onSubmit={handleSubmit} className="onboarding-form">
-        <div className="form-group">
-          <label>목표 대회</label>
-          <div className="chip-group">
+      <form onSubmit={handleSubmit} css={onboardingFormStyle}>
+        {/* 목표 대회 */}
+        <div css={formSectionStyle}>
+          <Paragraph typography="st6" color="secondary">목표 대회</Paragraph>
+          <Spacing size={spacing.sm} />
+          <ChipGroup>
             {EVENTS.map((ev) => (
-              <button
+              <Chip
                 key={ev.value}
-                type="button"
-                className={`chip ${goalEvent === ev.value ? 'active' : ''}`}
+                selected={goalEvent === ev.value}
                 onClick={() => setGoalEvent(ev.value)}
               >
                 {ev.label}
-              </button>
+              </Chip>
             ))}
+          </ChipGroup>
+        </div>
+
+        {/* 목표 기록 */}
+        <div css={formSectionStyle}>
+          <Paragraph typography="st6" color="secondary">목표 기록</Paragraph>
+          <Spacing size={spacing.sm} />
+          <div css={timeInputsRowStyle}>
+            <div css={timeFieldStyle}>
+              <TextField
+                variant="box"
+                type="number"
+                value={goalHours}
+                onChange={(e) => setGoalHours(e.target.value)}
+                css={timeInputWidthStyle}
+              />
+              <Paragraph typography="st6" color="secondary">시간</Paragraph>
+            </div>
+            <div css={timeFieldStyle}>
+              <TextField
+                variant="box"
+                type="number"
+                value={goalMinutes}
+                onChange={(e) => setGoalMinutes(e.target.value)}
+                css={timeInputWidthStyle}
+              />
+              <Paragraph typography="st6" color="secondary">분</Paragraph>
+            </div>
+            <div css={timeFieldStyle}>
+              <TextField
+                variant="box"
+                type="number"
+                value={goalSeconds}
+                onChange={(e) => setGoalSeconds(e.target.value)}
+                css={timeInputWidthStyle}
+              />
+              <Paragraph typography="st6" color="secondary">초</Paragraph>
+            </div>
           </div>
         </div>
 
-        <div className="form-group">
-          <label>목표 기록</label>
-          <div className="time-inputs">
-            <div className="time-field">
-              <input type="number" min={0} max={9} value={goalHours} onChange={(e) => setGoalHours(Number(e.target.value))} />
-              <span>시간</span>
-            </div>
-            <div className="time-field">
-              <input type="number" min={0} max={59} value={goalMinutes} onChange={(e) => setGoalMinutes(Number(e.target.value))} />
-              <span>분</span>
-            </div>
-            <div className="time-field">
-              <input type="number" min={0} max={59} value={goalSeconds} onChange={(e) => setGoalSeconds(Number(e.target.value))} />
-              <span>초</span>
-            </div>
-          </div>
+        {/* 대회 날짜 */}
+        <div css={formSectionStyle}>
+          <Paragraph typography="st6" color="secondary">대회 날짜</Paragraph>
+          <Spacing size={spacing.sm} />
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            css={dateInputStyle}
+          />
         </div>
 
-        <div className="form-group">
-          <label>대회 날짜</label>
-          <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="form-input" />
-        </div>
-
-        <div className="form-group">
-          <label>훈련 요일 (3일 이상)</label>
-          <div className="chip-group">
+        {/* 훈련 요일 */}
+        <div css={formSectionStyle}>
+          <Paragraph typography="st6" color="secondary">훈련 요일 (3일 이상)</Paragraph>
+          <Spacing size={spacing.sm} />
+          <ChipGroup>
             {DAYS.map((day) => (
-              <button
+              <Chip
                 key={day.value}
-                type="button"
-                className={`chip ${trainingDays.includes(day.value) ? 'active' : ''}`}
+                selected={trainingDays.includes(day.value)}
                 onClick={() => toggleDay(day.value)}
               >
                 {day.label}
-              </button>
+              </Chip>
             ))}
-          </div>
+          </ChipGroup>
         </div>
 
-        <div className="form-group">
-          <label>롱런 요일</label>
-          <div className="chip-group">
+        {/* 롱런 요일 */}
+        <div css={formSectionStyle}>
+          <Paragraph typography="st6" color="secondary">롱런 요일</Paragraph>
+          <Spacing size={spacing.sm} />
+          <ChipGroup>
             {DAYS.filter((d) => trainingDays.includes(d.value)).map((day) => (
-              <button
+              <Chip
                 key={day.value}
-                type="button"
-                className={`chip ${longRunDay === day.value ? 'active' : ''}`}
+                selected={longRunDay === day.value}
                 onClick={() => setLongRunDay(day.value)}
               >
                 {day.label}
-              </button>
+              </Chip>
             ))}
-          </div>
+          </ChipGroup>
         </div>
 
-        <div className="form-group">
-          <label>체중 (kg)</label>
-          <input
+        {/* 체중 */}
+        <div css={formSectionStyle}>
+          <TextField
+            variant="box"
+            label="체중 (kg)"
+            labelOption="sustain"
             type="number"
-            min={30}
-            max={200}
-            step={0.1}
             value={bodyWeight}
-            onChange={(e) => setBodyWeight(Number(e.target.value))}
-            className="form-input"
+            onChange={(e) => setBodyWeight(e.target.value)}
           />
         </div>
 
-        <div className="form-group">
-          <label>레이스 목표 체중 (선택)</label>
-          <input
+        {/* 레이스 목표 체중 */}
+        <div css={formSectionStyle}>
+          <TextField
+            variant="box"
+            label="레이스 목표 체중 (선택)"
+            labelOption="sustain"
             type="number"
-            min={30}
-            max={200}
-            step={0.1}
             value={targetWeight}
             onChange={(e) => setTargetWeight(e.target.value)}
             placeholder="예: 62.0"
-            className="form-input"
           />
         </div>
 
-        {error && <p className="error-text">{error}</p>}
+        {error && (
+          <>
+            <Paragraph typography="st6" color="danger">{error}</Paragraph>
+            <Spacing size={spacing.md} />
+          </>
+        )}
 
-        <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? '저장 중...' : '훈련 시작하기'}
-        </button>
+        <Spacing size={spacing.sm} />
+        <Button
+          type="submit"
+          display="block"
+          size="xlarge"
+          loading={loading}
+        >
+          훈련 시작하기
+        </Button>
+        <Spacing size={spacing.xxl} />
       </form>
     </div>
   );
 }
+
+const onboardingPageStyle = css`
+  ${pageStyle};
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+`;
+
+const onboardingFormStyle = css`
+  flex: 1;
+`;

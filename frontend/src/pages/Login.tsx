@@ -1,16 +1,31 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-
-const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
-const KAKAO_REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI || 'http://localhost:5173/auth/kakao/callback';
+import { appLogin } from '@apps-in-toss/web-bridge';
+import { oauthLogin } from '../api/auth';
+import { useAuth, GUEST_MODE_ENABLED } from '../contexts/AuthContext';
+import { Button, Paragraph, Spacing } from '@toss/tds-mobile';
+import { css } from '@emotion/react';
+import { spacing } from '../styles/tokens';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { loginAsGuest } = useAuth();
+  const { login, loginAsGuest } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleKakaoLogin = () => {
-    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${encodeURIComponent(KAKAO_REDIRECT_URI)}&response_type=code`;
-    window.location.href = url;
+  const handleTossLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { authorizationCode, referrer } = await appLogin();
+      const res = await oauthLogin('toss', authorizationCode, referrer);
+      login(res.token, res.isNewUser);
+      navigate(res.isNewUser ? '/onboarding' : '/today', { replace: true });
+    } catch {
+      setError('로그인에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGuestStart = () => {
@@ -19,26 +34,63 @@ export default function Login() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-logo">🏃</div>
-        <h1>러닝 코치</h1>
-        <p className="login-subtitle">당신만의 맞춤 러닝 훈련 플랜</p>
-
-        <div className="social-buttons">
-          <button className="kakao-login-btn" onClick={handleKakaoLogin}>
-            카카오로 시작하기
-          </button>
-        </div>
-
-        <div className="login-divider">
-          <span>또는</span>
-        </div>
-
-        <button className="btn-secondary" onClick={handleGuestStart}>
-          로그인 없이 시작하기
-        </button>
+    <div css={loginPageStyle}>
+      <div css={loginContainerStyle}>
+        <div css={logoStyle}>🏃</div>
+        <Spacing size={8} />
+        <Paragraph typography="t4">러닝 코치</Paragraph>
+        <Spacing size={8} />
+        <Paragraph typography="st6" color="secondary">
+          당신만의 맞춤 러닝 훈련 플랜
+        </Paragraph>
+        <Spacing size={32} />
+        {error && (
+          <>
+            <Paragraph typography="st6" color="danger">{error}</Paragraph>
+            <Spacing size={12} />
+          </>
+        )}
+        <Button
+          display="block"
+          size="xlarge"
+          onClick={handleTossLogin}
+          loading={loading}
+        >
+          토스로 시작하기
+        </Button>
+        {GUEST_MODE_ENABLED && (
+          <>
+            <Spacing size={spacing.md} />
+            <Button
+              display="block"
+              size="xlarge"
+              variant="weak"
+              onClick={handleGuestStart}
+            >
+              로그인 없이 시작하기
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
 }
+
+const loginPageStyle = css`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 20px;
+`;
+
+const loginContainerStyle = css`
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+`;
+
+const logoStyle = css`
+  font-size: 4rem;
+  margin-bottom: 8px;
+`;

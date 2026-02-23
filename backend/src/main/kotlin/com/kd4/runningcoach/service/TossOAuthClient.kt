@@ -1,56 +1,67 @@
 package com.kd4.runningcoach.service
 
 import com.kd4.runningcoach.entity.AuthProvider
-import org.springframework.beans.factory.annotation.Value
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
-import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.client.RestTemplate
 
 @Component
-@ConditionalOnProperty("oauth.toss.client-id", matchIfMissing = false)
-class TossOAuthClient(
-    @Value("\${oauth.toss.client-id}") private val clientId: String,
-    @Value("\${oauth.toss.client-secret}") private val clientSecret: String,
-    @Value("\${oauth.toss.redirect-uri}") private val redirectUri: String,
-    @Value("\${oauth.toss.token-uri}") private val tokenUri: String,
-    @Value("\${oauth.toss.user-info-uri}") private val userInfoUri: String,
-) : OAuthClient {
+@ConditionalOnProperty("oauth.toss.enabled", havingValue = "true", matchIfMissing = false)
+class TossOAuthClient : OAuthClient {
+
+    private val log = LoggerFactory.getLogger(TossOAuthClient::class.java)
 
     override val provider = AuthProvider.TOSS
     private val restTemplate = RestTemplate()
 
-    override fun exchangeCode(code: String): String {
-        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_FORM_URLENCODED }
-        val body = LinkedMultiValueMap<String, String>().apply {
-            add("grant_type", "authorization_code")
-            add("client_id", clientId)
-            add("client_secret", clientSecret)
-            add("redirect_uri", redirectUri)
-            add("code", code)
+    companion object {
+        private const val TOKEN_URL = "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/generate-token"
+        private const val USER_INFO_URL = "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2/login-me"
+    }
+
+    override fun exchangeCode(code: String, referrer: String?): String {
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
         }
+        val body = mapOf(
+            "authorizationCode" to code,
+            "referrer" to (referrer ?: "DEFAULT"),
+        )
+
+        log.info("[TossOAuth] Exchanging code, referrer={}", referrer ?: "DEFAULT")
+
         val response = restTemplate.postForObject(
-            tokenUri,
+            TOKEN_URL,
             HttpEntity(body, headers),
             Map::class.java,
-        ) ?: throw RuntimeException("Toss token exchange failed")
+        ) ?: throw RuntimeException("Toss token exchange failed: empty response")
 
-        return response["access_token"] as String
+        log.info("[TossOAuth] Token response keys: {}", response.keys)
+
+        return response["accessToken"] as? String
+            ?: throw RuntimeException("Toss token exchange failed: no accessToken in response")
     }
 
     override fun getUserId(accessToken: String): String {
-        val headers = HttpHeaders().apply { set("Authorization", "Bearer $accessToken") }
+        val headers = HttpHeaders().apply {
+            set("Authorization", "Bearer $accessToken")
+            contentType = MediaType.APPLICATION_JSON
+        }
         val response = restTemplate.exchange(
-            userInfoUri,
+            USER_INFO_URL,
             HttpMethod.GET,
             HttpEntity<Void>(headers),
             Map::class.java,
         )
-        return (response.body?.get("id") as? Any)?.toString()
-            ?: throw RuntimeException("Failed to get Toss user ID")
+
+        log.info("[TossOAuth] User info response keys: {}", response.body?.keys)
+
+        return (response.body?.get("userKey") as? Any)?.toString()
+            ?: throw RuntimeException("Failed to get Toss userKey")
     }
 }

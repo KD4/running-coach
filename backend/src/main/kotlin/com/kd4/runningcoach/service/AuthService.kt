@@ -20,12 +20,12 @@ class AuthService(
     data class LoginResult(val token: String, val isNewUser: Boolean)
 
     // --- OAuth 로그인 (카카오, 토스) ---
-    fun oauthLogin(providerName: String, code: String): LoginResult {
+    fun oauthLogin(providerName: String, code: String, referrer: String? = null): LoginResult {
         val provider = AuthProvider.valueOf(providerName.uppercase())
         val client = oauthClientMap[provider]
             ?: throw RuntimeException("지원하지 않는 로그인 방식입니다: $providerName")
 
-        val accessToken = client.exchangeCode(code)
+        val accessToken = client.exchangeCode(code, referrer)
         val providerUserId = client.getUserId(accessToken)
 
         return loginOrCreateOAuthUser(provider, providerUserId)

@@ -1,32 +1,16 @@
 import { useEffect, useState } from 'react';
 import { getMonthlySchedule } from '../api/schedule';
 import type { MonthlyScheduleResponse, ScheduleDayDto } from '../types';
-
-const WORKOUT_COLORS: Record<string, string> = {
-  EASY: '#4CAF50',
-  AR: '#66BB6A',
-  TEMPO: '#FF9800',
-  INTERVAL: '#F44336',
-  LONG: '#2196F3',
-  REST: '#9E9E9E',
-  RACE: '#9C27B0',
-  PACE_RUN: '#00BCD4',
-  ACTIVE_RECOVERY: '#78909C',
-};
-
-const WORKOUT_SHORT: Record<string, string> = {
-  EASY: '이지',
-  AR: 'AR',
-  TEMPO: '템포',
-  INTERVAL: '인터벌',
-  LONG: '롱런',
-  REST: '휴식',
-  RACE: '레이스',
-  PACE_RUN: '페이스',
-  ACTIVE_RECOVERY: '회복',
-};
+import { Paragraph, Spacing, Badge, Loader } from '@toss/tds-mobile';
+import { css } from '@emotion/react';
+import { WORKOUT_COLORS, WORKOUT_SHORT, WORKOUT_LABELS } from '../constants/workout';
+import { color, spacing, radius } from '../styles/tokens';
+import { pageStyle } from '../styles/common';
 
 const DAY_HEADERS = ['일', '월', '화', '수', '목', '금', '토'];
+
+/** 범례에서 제외할 workout 타입 */
+const LEGEND_EXCLUDE = new Set(['REST', 'PACE_RUN']);
 
 export default function Schedule() {
   const now = new Date();
@@ -65,10 +49,9 @@ export default function Schedule() {
     else setMonth(month + 1);
   };
 
-  // Build calendar grid
   const buildGrid = () => {
     if (!data) return [];
-    const firstDay = new Date(year, month - 1, 1).getDay(); // 0=Sun
+    const firstDay = new Date(year, month - 1, 1).getDay();
     const daysInMonth = new Date(year, month, 0).getDate();
 
     const dayMap: Record<string, ScheduleDayDto> = {};
@@ -86,39 +69,50 @@ export default function Schedule() {
   const cells = buildGrid();
 
   return (
-    <div className="page schedule-page">
-      <div className="month-nav">
-        <button className="nav-btn" onClick={prevMonth}>&lt;</button>
-        <h2>{year}년 {month}월</h2>
-        <button className="nav-btn" onClick={nextMonth}>&gt;</button>
+    <div css={pageStyle}>
+      {/* 월 네비게이션 */}
+      <div css={monthNavStyle}>
+        <button css={navBtnStyle} onClick={prevMonth} aria-label="이전 달">&#8249;</button>
+        <Paragraph typography="st5">{year}년 {month}월</Paragraph>
+        <button css={navBtnStyle} onClick={nextMonth} aria-label="다음 달">&#8250;</button>
       </div>
 
-      {loading && <p>로딩 중...</p>}
-      {error && <p className="error-text">{error}</p>}
+      {loading && (
+        <div css={loadingCenterStyle}>
+          <Loader />
+          <Spacing size={spacing.md} />
+          <Paragraph typography="st6" color="secondary">로딩 중...</Paragraph>
+        </div>
+      )}
+      {error && <Paragraph typography="st6" color="danger">{error}</Paragraph>}
 
       {!loading && !error && (
         <>
-          <div className="calendar">
-            <div className="calendar-header">
-              {DAY_HEADERS.map((d) => <div key={d} className="cal-header-cell">{d}</div>)}
+          {/* 캘린더 그리드 */}
+          <div css={calendarStyle}>
+            <div css={calendarHeaderStyle}>
+              {DAY_HEADERS.map((d) => (
+                <div key={d} css={calHeaderCellStyle}>{d}</div>
+              ))}
             </div>
-            <div className="calendar-body">
+            <div css={calendarBodyStyle}>
               {cells.map((cell, i) => {
-                if (!cell) return <div key={i} className="cal-cell empty" />;
+                if (!cell) return <div key={i} css={calCellEmptyStyle} />;
                 const day = new Date(cell.date).getDate();
                 const type = cell.workout?.workoutType;
-                const color = type ? WORKOUT_COLORS[type] ?? '#9E9E9E' : undefined;
+                const dotColor = type ? WORKOUT_COLORS[type] ?? '#9E9E9E' : undefined;
                 const isToday = cell.date === new Date().toISOString().split('T')[0];
+                const isSelected = selected?.date === cell.date;
 
                 return (
                   <div
                     key={i}
-                    className={`cal-cell ${isToday ? 'today' : ''} ${selected?.date === cell.date ? 'selected' : ''}`}
+                    css={calCellStyle(isSelected)}
                     onClick={() => setSelected(cell)}
                   >
-                    <span className="cal-day">{day}</span>
+                    <span css={calDayStyle(isToday)}>{day}</span>
                     {type && type !== 'REST' && (
-                      <span className="cal-dot" style={{ backgroundColor: color }} />
+                      <span css={calDotStyle(dotColor!)} />
                     )}
                   </div>
                 );
@@ -126,29 +120,53 @@ export default function Schedule() {
             </div>
           </div>
 
-          <div className="legend">
-            {Object.entries(WORKOUT_COLORS).filter(([k]) => k !== 'REST').map(([key, color]) => (
-              <div key={key} className="legend-item">
-                <span className="legend-dot" style={{ backgroundColor: color }} />
-                <span>{WORKOUT_SHORT[key]}</span>
-              </div>
-            ))}
+          {/* 범례 */}
+          <div css={legendStyle}>
+            {Object.entries(WORKOUT_COLORS)
+              .filter(([k]) => !LEGEND_EXCLUDE.has(k))
+              .map(([key, c]) => (
+                <div key={key} css={legendItemStyle}>
+                  <span css={legendDotStyle(c)} />
+                  <Paragraph typography="st7" color="secondary">{WORKOUT_SHORT[key]}</Paragraph>
+                </div>
+              ))}
           </div>
 
+          {/* 날짜 상세 */}
           {selected && (
-            <div className="day-detail">
-              <h3>{new Date(selected.date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</h3>
-              <span className="week-badge">Week {selected.weekNumber}</span>
+            <div css={dayDetailStyle}>
+              <Paragraph typography="st5">
+                {new Date(selected.date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+              </Paragraph>
+              <Spacing size={spacing.xs} />
+              <Badge size="small" variant="weak" color="blue">Week {selected.weekNumber}</Badge>
               {selected.workout && selected.workout.workoutType !== 'REST' ? (
-                <div className="detail-workout">
-                  <div className="workout-type-badge" style={{ backgroundColor: WORKOUT_COLORS[selected.workout.workoutType] ?? '#9E9E9E' }}>
-                    {WORKOUT_SHORT[selected.workout.workoutType] ?? selected.workout.workoutType}
+                <>
+                  <Spacing size={spacing.md} />
+                  <div css={workoutTypeLabelStyle(WORKOUT_COLORS[selected.workout.workoutType] ?? '#9E9E9E')}>
+                    <Paragraph typography="st8" css={css`color: #FFFFFF;`}>
+                      {WORKOUT_LABELS[selected.workout.workoutType] ?? selected.workout.workoutType}
+                    </Paragraph>
                   </div>
-                  <p><strong>{selected.workout.distanceKm} km</strong> {selected.workout.paceTarget && `| ${selected.workout.paceTarget}/km`}</p>
-                  {selected.workout.description && <p className="workout-desc">{selected.workout.description}</p>}
-                </div>
+                  <Spacing size={spacing.sm} />
+                  <Paragraph typography="st6">
+                    {selected.workout.distanceKm} km
+                    {selected.workout.paceTarget && ` | ${selected.workout.paceTarget}/km`}
+                  </Paragraph>
+                  {selected.workout.description && (
+                    <>
+                      <Spacing size={spacing.xs} />
+                      <Paragraph typography="st7" color="secondary">{selected.workout.description}</Paragraph>
+                    </>
+                  )}
+                </>
               ) : (
-                <p className="rest-message">{selected.isTrainingDay ? '휴식' : '훈련 없는 날'}</p>
+                <>
+                  <Spacing size={spacing.sm} />
+                  <Paragraph typography="st7" color="secondary">
+                    {selected.isTrainingDay ? '휴식' : '훈련 없는 날'}
+                  </Paragraph>
+                </>
               )}
             </div>
           )}
@@ -157,3 +175,137 @@ export default function Schedule() {
     </div>
   );
 }
+
+const monthNavStyle = css`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${spacing.lg}px 0;
+`;
+
+const navBtnStyle = css`
+  width: 40px;
+  height: 40px;
+  border: 1px solid ${color.border};
+  border-radius: 50%;
+  background: ${color.bgCard};
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${color.text};
+  &:active {
+    background: ${color.primaryLight};
+  }
+`;
+
+const loadingCenterStyle = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 0;
+`;
+
+const calendarStyle = css`
+  background: ${color.bgCard};
+  border-radius: ${radius.card}px;
+  padding: ${spacing.lg}px;
+  margin-bottom: ${spacing.md}px;
+`;
+
+const calendarHeaderStyle = css`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: ${spacing.xs}px;
+`;
+
+const calHeaderCellStyle = css`
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: ${color.textSecondary};
+  padding: ${spacing.sm}px 0;
+`;
+
+const calendarBodyStyle = css`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+`;
+
+const calCellEmptyStyle = css`
+  aspect-ratio: 1;
+`;
+
+const calCellStyle = (isSelected: boolean) => css`
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: ${radius.medium}px;
+  cursor: pointer;
+  gap: 2px;
+  position: relative;
+  background: ${isSelected ? color.primaryLight : 'transparent'};
+  &:hover {
+    background: ${color.primaryLight};
+  }
+`;
+
+const calDayStyle = (isToday: boolean) => css`
+  font-size: 1rem;
+  font-weight: 500;
+  ${isToday ? `
+    background: ${color.primary};
+    color: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  ` : ''}
+`;
+
+const calDotStyle = (dotColor: string) => css`
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: ${dotColor};
+`;
+
+const legendStyle = css`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: ${spacing.sm}px ${spacing.md}px;
+  margin-bottom: ${spacing.lg}px;
+`;
+
+const legendItemStyle = css`
+  display: flex;
+  align-items: center;
+  gap: ${spacing.xs}px;
+`;
+
+const legendDotStyle = (dotColor: string) => css`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: ${dotColor};
+`;
+
+const dayDetailStyle = css`
+  background: ${color.bgCard};
+  border-radius: ${radius.card}px;
+  padding: ${spacing.lg}px ${spacing.xl}px;
+`;
+
+const workoutTypeLabelStyle = (bgColor: string) => css`
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: ${radius.pill}px;
+  background: ${bgColor};
+`;

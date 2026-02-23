@@ -4,7 +4,7 @@ import com.kd4.runningcoach.service.AuthService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
-data class OAuthLoginRequest(val provider: String, val code: String)
+data class OAuthLoginRequest(val provider: String, val code: String, val referrer: String? = null)
 data class LocalLoginRequest(val email: String, val password: String)
 data class RegisterRequest(val email: String, val password: String)
 data class LoginResponse(val token: String, val isNewUser: Boolean)
@@ -17,7 +17,7 @@ class AuthController(
 
     @PostMapping("/oauth")
     fun oauthLogin(@RequestBody request: OAuthLoginRequest): ResponseEntity<LoginResponse> {
-        val result = authService.oauthLogin(request.provider, request.code)
+        val result = authService.oauthLogin(request.provider, request.code, request.referrer)
         return ResponseEntity.ok(LoginResponse(token = result.token, isNewUser = result.isNewUser))
     }
 

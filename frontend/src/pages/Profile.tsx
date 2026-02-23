@@ -4,30 +4,13 @@ import { getProfile, updateProfile } from '../api/user';
 import type { ProfileResponse } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
 import type { GuestProfile } from '../contexts/AuthContext';
-
-const DAYS = [
-  { value: 'MON', label: '월' },
-  { value: 'TUE', label: '화' },
-  { value: 'WED', label: '수' },
-  { value: 'THU', label: '목' },
-  { value: 'FRI', label: '금' },
-  { value: 'SAT', label: '토' },
-  { value: 'SUN', label: '일' },
-];
-
-const EVENTS = [
-  { value: '10K', label: '10K' },
-  { value: 'HALF', label: '하프 마라톤' },
-  { value: 'MARATHON', label: '풀 마라톤' },
-];
-
-function formatTime(seconds: number): { h: number; m: number; s: number } {
-  return {
-    h: Math.floor(seconds / 3600),
-    m: Math.floor((seconds % 3600) / 60),
-    s: seconds % 60,
-  };
-}
+import { Button, Paragraph, Spacing, TextField, TextButton, Loader } from '@toss/tds-mobile';
+import { css } from '@emotion/react';
+import { DAYS, EVENTS, formatTime } from '../constants/workout';
+import { color, spacing, radius } from '../styles/tokens';
+import { pageStyle, centerStyle, formSectionStyle, dateInputStyle, timeInputsRowStyle, timeFieldStyle, timeInputWidthStyle } from '../styles/common';
+import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 
 function guestToProfileResponse(g: GuestProfile): ProfileResponse {
   return {
@@ -51,16 +34,15 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // edit form state
   const [goalEvent, setGoalEvent] = useState('');
-  const [goalH, setGoalH] = useState(0);
-  const [goalM, setGoalM] = useState(0);
-  const [goalS, setGoalS] = useState(0);
+  const [goalH, setGoalH] = useState('0');
+  const [goalM, setGoalM] = useState('0');
+  const [goalS, setGoalS] = useState('0');
   const [targetDate, setTargetDate] = useState('');
   const [trainingDays, setTrainingDays] = useState<string[]>([]);
   const [longRunDay, setLongRunDay] = useState('');
-  const [bodyWeight, setBodyWeight] = useState(70);
-  const [targetWeight, setTargetWeight] = useState<string>('');
+  const [bodyWeight, setBodyWeight] = useState('70');
+  const [targetWeight, setTargetWeight] = useState('');
 
   useEffect(() => {
     if (isGuest && guestProfile) {
@@ -88,13 +70,13 @@ export default function Profile() {
   const fillForm = (p: ProfileResponse) => {
     setGoalEvent(p.goalEvent);
     const t = formatTime(p.goalTimeSeconds);
-    setGoalH(t.h);
-    setGoalM(t.m);
-    setGoalS(t.s);
+    setGoalH(String(t.h));
+    setGoalM(String(t.m));
+    setGoalS(String(t.s));
     setTargetDate(p.targetDate);
     setTrainingDays(p.trainingDays);
     setLongRunDay(p.longRunDay);
-    setBodyWeight(p.bodyWeight);
+    setBodyWeight(String(p.bodyWeight));
     setTargetWeight(p.targetWeight != null ? String(p.targetWeight) : '');
   };
 
@@ -118,11 +100,11 @@ export default function Profile() {
 
     const profileData = {
       goalEvent,
-      goalTimeSeconds: goalH * 3600 + goalM * 60 + goalS,
+      goalTimeSeconds: Number(goalH) * 3600 + Number(goalM) * 60 + Number(goalS),
       targetDate,
       trainingDays,
       longRunDay,
-      bodyWeight,
+      bodyWeight: Number(bodyWeight),
       targetWeight: targetWeight ? Number(targetWeight) : null,
     };
 
@@ -155,121 +137,258 @@ export default function Profile() {
     setError(null);
   };
 
-  if (loading) return <div className="page"><p>로딩 중...</p></div>;
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
-  if (!profile) return <div className="page"><p className="error-text">{error || '프로필이 없습니다.'}</p></div>;
+  if (loading) {
+    return (
+      <div css={[pageStyle, centerStyle]}>
+        <Loader />
+        <Spacing size={12} />
+        <Paragraph typography="st6" color="secondary">로딩 중...</Paragraph>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div css={pageStyle}>
+        <Spacing size={spacing.xxl} />
+        <Paragraph typography="st6" color="danger">{error || '프로필이 없습니다.'}</Paragraph>
+      </div>
+    );
+  }
 
   const eventLabel = EVENTS.find((e) => e.value === profile.goalEvent)?.label ?? profile.goalEvent;
   const time = formatTime(profile.goalTimeSeconds);
 
   return (
-    <div className="page profile-page">
-      <h1>내 프로필</h1>
+    <div css={pageStyle}>
+      <Spacing size={spacing.lg} />
+      <Paragraph typography="st5">내 프로필</Paragraph>
+      <Spacing size={spacing.lg} />
 
       {!editing ? (
-        <div className="profile-view">
-          <div className="profile-card">
-            <div className="profile-row"><span className="label">목표 대회</span><span>{eventLabel}</span></div>
-            <div className="profile-row"><span className="label">목표 기록</span><span>{time.h}시간 {time.m}분 {time.s}초</span></div>
-            <div className="profile-row"><span className="label">대회 날짜</span><span>{profile.targetDate}</span></div>
-            <div className="profile-row">
-              <span className="label">훈련 요일</span>
-              <span>{profile.trainingDays.map((d) => DAYS.find((dd) => dd.value === d)?.label).join(', ')}</span>
+        <>
+          <div css={profileCardStyle}>
+            <div css={profileRowStyle}>
+              <Paragraph typography="st7" color="secondary">목표 대회</Paragraph>
+              <Paragraph typography="st7">{eventLabel}</Paragraph>
             </div>
-            <div className="profile-row">
-              <span className="label">롱런 요일</span>
-              <span>{DAYS.find((d) => d.value === profile.longRunDay)?.label}</span>
+            <div css={profileRowStyle}>
+              <Paragraph typography="st7" color="secondary">목표 기록</Paragraph>
+              <Paragraph typography="st7">{time.h}시간 {time.m}분 {time.s}초</Paragraph>
             </div>
-            <div className="profile-row"><span className="label">체중</span><span>{profile.bodyWeight} kg</span></div>
+            <div css={profileRowStyle}>
+              <Paragraph typography="st7" color="secondary">대회 날짜</Paragraph>
+              <Paragraph typography="st7">{profile.targetDate}</Paragraph>
+            </div>
+            <div css={profileRowStyle}>
+              <Paragraph typography="st7" color="secondary">훈련 요일</Paragraph>
+              <Paragraph typography="st7">
+                {profile.trainingDays.map((d) => DAYS.find((dd) => dd.value === d)?.label).join(', ')}
+              </Paragraph>
+            </div>
+            <div css={profileRowStyle}>
+              <Paragraph typography="st7" color="secondary">롱런 요일</Paragraph>
+              <Paragraph typography="st7">{DAYS.find((d) => d.value === profile.longRunDay)?.label}</Paragraph>
+            </div>
+            <div css={profile.targetWeight != null ? profileRowStyle : profileRowLastStyle}>
+              <Paragraph typography="st7" color="secondary">체중</Paragraph>
+              <Paragraph typography="st7">{profile.bodyWeight} kg</Paragraph>
+            </div>
             {profile.targetWeight != null && (
-              <div className="profile-row"><span className="label">목표 체중</span><span>{profile.targetWeight} kg</span></div>
+              <div css={profileRowLastStyle}>
+                <Paragraph typography="st7" color="secondary">목표 체중</Paragraph>
+                <Paragraph typography="st7">{profile.targetWeight} kg</Paragraph>
+              </div>
             )}
           </div>
-          {success && <p className="success-text">저장 완료!</p>}
-          {isGuest && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 12 }}>게스트 모드로 사용 중입니다. 로그인하면 데이터가 저장됩니다.</p>}
-          <button className="btn-primary" onClick={() => setEditing(true)}>수정하기</button>
-          {isGuest ? (
-            <button className="btn-secondary" onClick={() => { logout(); navigate('/login', { replace: true }); }} style={{ marginTop: 8 }}>로그인하기</button>
-          ) : (
-            <button className="btn-secondary" onClick={logout} style={{ marginTop: 8 }}>로그아웃</button>
+
+          {success && (
+            <>
+              <Spacing size={spacing.sm} />
+              <Paragraph typography="st7" css={css`color: ${color.success};`}>저장 완료!</Paragraph>
+            </>
           )}
-        </div>
+
+          {isGuest && (
+            <>
+              <Spacing size={spacing.sm} />
+              <Paragraph typography="st8" color="secondary">
+                게스트 모드로 사용 중입니다. 로그인하면 데이터가 저장됩니다.
+              </Paragraph>
+            </>
+          )}
+
+          <Spacing size={spacing.xxl} />
+          <Button display="block" size="large" onClick={() => setEditing(true)}>
+            수정하기
+          </Button>
+          <Spacing size={spacing.md} />
+          <div css={logoutRowStyle}>
+            {isGuest ? (
+              <TextButton size="medium" variant="underline" onClick={handleLogout}>
+                로그인하기
+              </TextButton>
+            ) : (
+              <TextButton size="medium" variant="underline" onClick={handleLogout}>
+                로그아웃
+              </TextButton>
+            )}
+          </div>
+        </>
       ) : (
-        <div className="profile-edit">
-          <div className="form-group">
-            <label>목표 대회</label>
-            <div className="chip-group">
+        <>
+          {/* 목표 대회 */}
+          <div css={formSectionStyle}>
+            <Paragraph typography="st7" color="secondary">목표 대회</Paragraph>
+            <Spacing size={spacing.sm} />
+            <ChipGroup>
               {EVENTS.map((ev) => (
-                <button key={ev.value} type="button" className={`chip ${goalEvent === ev.value ? 'active' : ''}`} onClick={() => setGoalEvent(ev.value)}>
+                <Chip
+                  key={ev.value}
+                  selected={goalEvent === ev.value}
+                  onClick={() => setGoalEvent(ev.value)}
+                >
                   {ev.label}
-                </button>
+                </Chip>
               ))}
+            </ChipGroup>
+          </div>
+
+          {/* 목표 기록 */}
+          <div css={formSectionStyle}>
+            <Paragraph typography="st7" color="secondary">목표 기록</Paragraph>
+            <Spacing size={spacing.sm} />
+            <div css={timeInputsRowStyle}>
+              <div css={timeFieldStyle}>
+                <TextField variant="box" type="number" value={goalH} onChange={(e) => setGoalH(e.target.value)} css={timeInputWidthStyle} />
+                <Paragraph typography="st7" color="secondary">시간</Paragraph>
+              </div>
+              <div css={timeFieldStyle}>
+                <TextField variant="box" type="number" value={goalM} onChange={(e) => setGoalM(e.target.value)} css={timeInputWidthStyle} />
+                <Paragraph typography="st7" color="secondary">분</Paragraph>
+              </div>
+              <div css={timeFieldStyle}>
+                <TextField variant="box" type="number" value={goalS} onChange={(e) => setGoalS(e.target.value)} css={timeInputWidthStyle} />
+                <Paragraph typography="st7" color="secondary">초</Paragraph>
+              </div>
             </div>
           </div>
 
-          <div className="form-group">
-            <label>목표 기록</label>
-            <div className="time-inputs">
-              <div className="time-field">
-                <input type="number" min={0} max={9} value={goalH} onChange={(e) => setGoalH(Number(e.target.value))} />
-                <span>시간</span>
-              </div>
-              <div className="time-field">
-                <input type="number" min={0} max={59} value={goalM} onChange={(e) => setGoalM(Number(e.target.value))} />
-                <span>분</span>
-              </div>
-              <div className="time-field">
-                <input type="number" min={0} max={59} value={goalS} onChange={(e) => setGoalS(Number(e.target.value))} />
-                <span>초</span>
-              </div>
-            </div>
+          {/* 대회 날짜 */}
+          <div css={formSectionStyle}>
+            <Paragraph typography="st7" color="secondary">대회 날짜</Paragraph>
+            <Spacing size={spacing.sm} />
+            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} css={dateInputStyle} />
           </div>
 
-          <div className="form-group">
-            <label>대회 날짜</label>
-            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="form-input" />
-          </div>
-
-          <div className="form-group">
-            <label>훈련 요일</label>
-            <div className="chip-group">
+          {/* 훈련 요일 */}
+          <div css={formSectionStyle}>
+            <Paragraph typography="st7" color="secondary">훈련 요일 (3일 이상)</Paragraph>
+            <Spacing size={spacing.sm} />
+            <ChipGroup>
               {DAYS.map((day) => (
-                <button key={day.value} type="button" className={`chip ${trainingDays.includes(day.value) ? 'active' : ''}`} onClick={() => toggleDay(day.value)}>
+                <Chip
+                  key={day.value}
+                  selected={trainingDays.includes(day.value)}
+                  onClick={() => toggleDay(day.value)}
+                >
                   {day.label}
-                </button>
+                </Chip>
               ))}
-            </div>
+            </ChipGroup>
           </div>
 
-          <div className="form-group">
-            <label>롱런 요일</label>
-            <div className="chip-group">
+          {/* 롱런 요일 */}
+          <div css={formSectionStyle}>
+            <Paragraph typography="st7" color="secondary">롱런 요일</Paragraph>
+            <Spacing size={spacing.sm} />
+            <ChipGroup>
               {DAYS.filter((d) => trainingDays.includes(d.value)).map((day) => (
-                <button key={day.value} type="button" className={`chip ${longRunDay === day.value ? 'active' : ''}`} onClick={() => setLongRunDay(day.value)}>
+                <Chip
+                  key={day.value}
+                  selected={longRunDay === day.value}
+                  onClick={() => setLongRunDay(day.value)}
+                >
                   {day.label}
-                </button>
+                </Chip>
               ))}
-            </div>
+            </ChipGroup>
           </div>
 
-          <div className="form-group">
-            <label>체중 (kg)</label>
-            <input type="number" min={30} max={200} step={0.1} value={bodyWeight} onChange={(e) => setBodyWeight(Number(e.target.value))} className="form-input" />
+          {/* 체중 */}
+          <div css={formSectionStyle}>
+            <TextField
+              variant="box"
+              label="체중 (kg)"
+              labelOption="sustain"
+              type="number"
+              value={bodyWeight}
+              onChange={(e) => setBodyWeight(e.target.value)}
+            />
           </div>
 
-          <div className="form-group">
-            <label>레이스 목표 체중 (선택)</label>
-            <input type="number" min={30} max={200} step={0.1} value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)} placeholder="예: 62.0" className="form-input" />
+          {/* 목표 체중 */}
+          <div css={formSectionStyle}>
+            <TextField
+              variant="box"
+              label="레이스 목표 체중 (선택)"
+              labelOption="sustain"
+              type="number"
+              value={targetWeight}
+              onChange={(e) => setTargetWeight(e.target.value)}
+              placeholder="예: 62.0"
+            />
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          {error && (
+            <>
+              <Paragraph typography="st7" color="danger">{error}</Paragraph>
+              <Spacing size={spacing.md} />
+            </>
+          )}
 
-          <div className="btn-row">
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? '저장 중...' : '저장'}</button>
-            <button className="btn-secondary" onClick={handleCancel}>취소</button>
-          </div>
-        </div>
+          <Button display="block" size="large" onClick={handleSave} loading={saving}>
+            저장
+          </Button>
+          <Spacing size={spacing.md} />
+          <Button display="block" size="large" variant="weak" onClick={handleCancel}>
+            취소
+          </Button>
+          <Spacing size={spacing.xxl} />
+        </>
       )}
     </div>
   );
 }
+
+const profileCardStyle = css`
+  background: ${color.bgCard};
+  border-radius: ${radius.card}px;
+  padding: ${spacing.xs}px ${spacing.xl}px;
+`;
+
+const profileRowStyle = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${spacing.md}px 0;
+  border-bottom: 1px solid ${color.border};
+`;
+
+const profileRowLastStyle = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${spacing.md}px 0;
+`;
+
+const logoutRowStyle = css`
+  display: flex;
+  justify-content: center;
+  padding: ${spacing.sm}px 0;
+`;
