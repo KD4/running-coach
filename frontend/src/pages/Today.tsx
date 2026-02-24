@@ -226,11 +226,6 @@ const workoutDetailsStyle = css`
   line-height: 1.4;
 `;
 
-const workoutSepStyle = css`
-  color: ${color.textSecondary};
-  margin: 0 ${spacing.sm}px;
-`;
-
 const caloriesCardStyle = css`
   background: ${color.bgCard};
   border-radius: ${radius.card}px;

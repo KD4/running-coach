@@ -1,5 +1,4 @@
 import { css } from '@emotion/react';
-import { spacing } from '../styles/tokens';
 
 interface ChipGroupProps {
   children: React.ReactNode;

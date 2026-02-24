@@ -23,3 +23,7 @@ oauth:
     redirect-uri: ${KAKAO_REDIRECT_URI:}
   toss:
     enabled: ${TOSS_OAUTH_ENABLED:true}
+
+toss:
+  disconnect:
+    basic-auth: ${TOSS_DISCONNECT_BASIC_AUTH:}

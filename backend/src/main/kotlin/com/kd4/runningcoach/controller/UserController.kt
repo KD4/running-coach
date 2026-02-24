@@ -37,4 +37,11 @@ class UserController(
         val userId = request.getAttribute("userId") as Long
         return ResponseEntity.ok(userService.updateProfile(userId, body))
     }
+
+    @DeleteMapping("/account")
+    fun deleteAccount(request: HttpServletRequest): ResponseEntity<Void> {
+        val userId = request.getAttribute("userId") as Long
+        userService.deleteUser(userId)
+        return ResponseEntity.ok().build()
+    }
 }

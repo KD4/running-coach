@@ -41,10 +41,12 @@ class TossOAuthClient : OAuthClient {
             Map::class.java,
         ) ?: throw RuntimeException("Toss token exchange failed: empty response")
 
-        log.info("[TossOAuth] Token response keys: {}", response.keys)
+        log.info("[TossOAuth] Token response resultType={}, keys={}", response["resultType"], response.keys)
 
-        return response["accessToken"] as? String
-            ?: throw RuntimeException("Toss token exchange failed: no accessToken in response")
+        val result = response["success"] as? Map<*, *>
+            ?: throw RuntimeException("Toss token exchange failed: resultType=${response["resultType"]}, error=${response["error"]}")
+        return result["accessToken"] as? String
+            ?: throw RuntimeException("Toss token exchange failed: no accessToken in success")
     }
 
     override fun getUserId(accessToken: String): String {
@@ -59,9 +61,12 @@ class TossOAuthClient : OAuthClient {
             Map::class.java,
         )
 
-        log.info("[TossOAuth] User info response keys: {}", response.body?.keys)
+        val body = response.body ?: throw RuntimeException("Empty response from Toss user info")
+        log.info("[TossOAuth] User info response resultType={}, keys={}", body["resultType"], body.keys)
 
-        return (response.body?.get("userKey") as? Any)?.toString()
-            ?: throw RuntimeException("Failed to get Toss userKey")
+        val result = body["success"] as? Map<*, *>
+            ?: throw RuntimeException("Failed to get Toss user info: resultType=${body["resultType"]}, error=${body["error"]}")
+        return (result["userKey"] as? Any)?.toString()
+            ?: throw RuntimeException("Failed to get Toss userKey from success")
     }
 }
