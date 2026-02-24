@@ -4,13 +4,14 @@ import { getProfile, updateProfile } from '../api/user';
 import type { ProfileResponse } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
 import type { GuestProfile } from '../contexts/AuthContext';
-import { Button, Paragraph, Spacing, TextField, TextButton, Loader } from '@toss/tds-mobile';
+import { Button, List, ListRow, Paragraph, Spacing, TextButton, Loader, Top } from '@toss/tds-mobile';
+import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
 import { DAYS, EVENTS, formatTime } from '../constants/workout';
-import { color, spacing, radius } from '../styles/tokens';
-import { pageStyle, centerStyle, formSectionStyle, dateInputStyle, timeInputsRowStyle, timeFieldStyle, timeInputWidthStyle } from '../styles/common';
-import Chip from '../components/Chip';
-import ChipGroup from '../components/ChipGroup';
+import { color, spacing } from '../styles/tokens';
+import { pageStyle, centerStyle } from '../styles/common';
+import ProfileWizard from '../components/wizard/ProfileWizard';
+import type { WizardFormData } from '../components/wizard/types';
 
 function guestToProfileResponse(g: GuestProfile): ProfileResponse {
   return {
@@ -24,38 +25,40 @@ function guestToProfileResponse(g: GuestProfile): ProfileResponse {
   };
 }
 
+function profileToWizardData(p: ProfileResponse): WizardFormData {
+  const t = formatTime(p.goalTimeSeconds);
+  return {
+    goalEvent: p.goalEvent,
+    goalHours: String(t.h),
+    goalMinutes: String(t.m),
+    goalSeconds: String(t.s),
+    targetDate: p.targetDate,
+    trainingDays: p.trainingDays,
+    longRunDay: p.longRunDay,
+    bodyWeight: String(p.bodyWeight),
+    targetWeight: p.targetWeight != null ? String(p.targetWeight) : '',
+  };
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { logout, isGuest, guestProfile, setGuestProfile } = useAuth();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  const [goalEvent, setGoalEvent] = useState('');
-  const [goalH, setGoalH] = useState('0');
-  const [goalM, setGoalM] = useState('0');
-  const [goalS, setGoalS] = useState('0');
-  const [targetDate, setTargetDate] = useState('');
-  const [trainingDays, setTrainingDays] = useState<string[]>([]);
-  const [longRunDay, setLongRunDay] = useState('');
-  const [bodyWeight, setBodyWeight] = useState('70');
-  const [targetWeight, setTargetWeight] = useState('');
 
   useEffect(() => {
     if (isGuest && guestProfile) {
       const p = guestToProfileResponse(guestProfile);
       setProfile(p);
-      fillForm(p);
       setLoading(false);
       return;
     }
     getProfile()
       .then((p) => {
         setProfile(p);
-        fillForm(p);
       })
       .catch((err) => {
         if (err?.response?.status === 404) {
@@ -67,45 +70,16 @@ export default function Profile() {
       .finally(() => setLoading(false));
   }, []);
 
-  const fillForm = (p: ProfileResponse) => {
-    setGoalEvent(p.goalEvent);
-    const t = formatTime(p.goalTimeSeconds);
-    setGoalH(String(t.h));
-    setGoalM(String(t.m));
-    setGoalS(String(t.s));
-    setTargetDate(p.targetDate);
-    setTrainingDays(p.trainingDays);
-    setLongRunDay(p.longRunDay);
-    setBodyWeight(String(p.bodyWeight));
-    setTargetWeight(p.targetWeight != null ? String(p.targetWeight) : '');
-  };
-
-  const toggleDay = (day: string) => {
-    setTrainingDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
-  };
-
-  const handleSave = async () => {
-    setError(null);
-    setSuccess(false);
-    if (trainingDays.length < 3) {
-      setError('최소 3일 이상의 훈련일을 선택해주세요.');
-      return;
-    }
-    if (!trainingDays.includes(longRunDay)) {
-      setError('롱런 요일은 훈련일에 포함되어야 합니다.');
-      return;
-    }
-
+  const handleWizardComplete = async (data: WizardFormData) => {
     const profileData = {
-      goalEvent,
-      goalTimeSeconds: Number(goalH) * 3600 + Number(goalM) * 60 + Number(goalS),
-      targetDate,
-      trainingDays,
-      longRunDay,
-      bodyWeight: Number(bodyWeight),
-      targetWeight: targetWeight ? Number(targetWeight) : null,
+      goalEvent: data.goalEvent,
+      goalTimeSeconds:
+        Number(data.goalHours) * 3600 + Number(data.goalMinutes) * 60 + Number(data.goalSeconds),
+      targetDate: data.targetDate,
+      trainingDays: data.trainingDays,
+      longRunDay: data.longRunDay,
+      bodyWeight: Number(data.bodyWeight),
+      targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
     };
 
     if (isGuest) {
@@ -117,24 +91,15 @@ export default function Profile() {
       return;
     }
 
-    setSaving(true);
-    try {
-      const updated = await updateProfile(profileData);
-      setProfile(updated);
-      setEditing(false);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
-    } catch {
-      setError('저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
+    const updated = await updateProfile(profileData);
+    setProfile(updated);
+    setEditing(false);
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 2000);
   };
 
   const handleCancel = () => {
-    if (profile) fillForm(profile);
     setEditing(false);
-    setError(null);
   };
 
   const handleLogout = () => {
@@ -163,232 +128,202 @@ export default function Profile() {
 
   const eventLabel = EVENTS.find((e) => e.value === profile.goalEvent)?.label ?? profile.goalEvent;
   const time = formatTime(profile.goalTimeSeconds);
+  const trainingDaysLabel = profile.trainingDays
+    .map((d) => DAYS.find((dd) => dd.value === d)?.label)
+    .join(', ');
+  const longRunDayLabel = DAYS.find((d) => d.value === profile.longRunDay)?.label ?? '';
 
   return (
-    <div css={pageStyle}>
-      <Spacing size={spacing.lg} />
-      <Paragraph typography="st5">내 프로필</Paragraph>
-      <Spacing size={spacing.lg} />
+    <>
+      <div css={pageStyle}>
+        <Top
+          upperGap={8}
+          lowerGap={spacing.md}
+          title={<Top.TitleParagraph>내 프로필</Top.TitleParagraph>}
+        />
 
-      {!editing ? (
-        <>
-          <div css={profileCardStyle}>
-            <div css={profileRowStyle}>
-              <Paragraph typography="st7" color="secondary">목표 대회</Paragraph>
-              <Paragraph typography="st7">{eventLabel}</Paragraph>
-            </div>
-            <div css={profileRowStyle}>
-              <Paragraph typography="st7" color="secondary">목표 기록</Paragraph>
-              <Paragraph typography="st7">{time.h}시간 {time.m}분 {time.s}초</Paragraph>
-            </div>
-            <div css={profileRowStyle}>
-              <Paragraph typography="st7" color="secondary">대회 날짜</Paragraph>
-              <Paragraph typography="st7">{profile.targetDate}</Paragraph>
-            </div>
-            <div css={profileRowStyle}>
-              <Paragraph typography="st7" color="secondary">훈련 요일</Paragraph>
-              <Paragraph typography="st7">
-                {profile.trainingDays.map((d) => DAYS.find((dd) => dd.value === d)?.label).join(', ')}
-              </Paragraph>
-            </div>
-            <div css={profileRowStyle}>
-              <Paragraph typography="st7" color="secondary">롱런 요일</Paragraph>
-              <Paragraph typography="st7">{DAYS.find((d) => d.value === profile.longRunDay)?.label}</Paragraph>
-            </div>
-            <div css={profile.targetWeight != null ? profileRowStyle : profileRowLastStyle}>
-              <Paragraph typography="st7" color="secondary">체중</Paragraph>
-              <Paragraph typography="st7">{profile.bodyWeight} kg</Paragraph>
-            </div>
-            {profile.targetWeight != null && (
-              <div css={profileRowLastStyle}>
-                <Paragraph typography="st7" color="secondary">목표 체중</Paragraph>
-                <Paragraph typography="st7">{profile.targetWeight} kg</Paragraph>
-              </div>
-            )}
-          </div>
-
-          {success && (
-            <>
-              <Spacing size={spacing.sm} />
-              <Paragraph typography="st7" css={css`color: ${color.success};`}>저장 완료!</Paragraph>
-            </>
-          )}
-
-          {isGuest && (
-            <>
-              <Spacing size={spacing.sm} />
-              <Paragraph typography="st8" color="secondary">
-                게스트 모드로 사용 중입니다. 로그인하면 데이터가 저장됩니다.
-              </Paragraph>
-            </>
-          )}
-
-          <Spacing size={spacing.xxl} />
-          <Button display="block" size="large" onClick={() => setEditing(true)}>
-            수정하기
-          </Button>
-          <Spacing size={spacing.md} />
-          <div css={logoutRowStyle}>
-            {isGuest ? (
-              <TextButton size="medium" variant="underline" onClick={handleLogout}>
-                로그인하기
-              </TextButton>
-            ) : (
-              <TextButton size="medium" variant="underline" onClick={handleLogout}>
-                로그아웃
-              </TextButton>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          {/* 목표 대회 */}
-          <div css={formSectionStyle}>
-            <Paragraph typography="st7" color="secondary">목표 대회</Paragraph>
-            <Spacing size={spacing.sm} />
-            <ChipGroup>
-              {EVENTS.map((ev) => (
-                <Chip
-                  key={ev.value}
-                  selected={goalEvent === ev.value}
-                  onClick={() => setGoalEvent(ev.value)}
-                >
-                  {ev.label}
-                </Chip>
-              ))}
-            </ChipGroup>
-          </div>
-
-          {/* 목표 기록 */}
-          <div css={formSectionStyle}>
-            <Paragraph typography="st7" color="secondary">목표 기록</Paragraph>
-            <Spacing size={spacing.sm} />
-            <div css={timeInputsRowStyle}>
-              <div css={timeFieldStyle}>
-                <TextField variant="box" type="number" value={goalH} onChange={(e) => setGoalH(e.target.value)} css={timeInputWidthStyle} />
-                <Paragraph typography="st7" color="secondary">시간</Paragraph>
-              </div>
-              <div css={timeFieldStyle}>
-                <TextField variant="box" type="number" value={goalM} onChange={(e) => setGoalM(e.target.value)} css={timeInputWidthStyle} />
-                <Paragraph typography="st7" color="secondary">분</Paragraph>
-              </div>
-              <div css={timeFieldStyle}>
-                <TextField variant="box" type="number" value={goalS} onChange={(e) => setGoalS(e.target.value)} css={timeInputWidthStyle} />
-                <Paragraph typography="st7" color="secondary">초</Paragraph>
-              </div>
-            </div>
-          </div>
-
-          {/* 대회 날짜 */}
-          <div css={formSectionStyle}>
-            <Paragraph typography="st7" color="secondary">대회 날짜</Paragraph>
-            <Spacing size={spacing.sm} />
-            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} css={dateInputStyle} />
-          </div>
-
-          {/* 훈련 요일 */}
-          <div css={formSectionStyle}>
-            <Paragraph typography="st7" color="secondary">훈련 요일 (3일 이상)</Paragraph>
-            <Spacing size={spacing.sm} />
-            <ChipGroup>
-              {DAYS.map((day) => (
-                <Chip
-                  key={day.value}
-                  selected={trainingDays.includes(day.value)}
-                  onClick={() => toggleDay(day.value)}
-                >
-                  {day.label}
-                </Chip>
-              ))}
-            </ChipGroup>
-          </div>
-
-          {/* 롱런 요일 */}
-          <div css={formSectionStyle}>
-            <Paragraph typography="st7" color="secondary">롱런 요일</Paragraph>
-            <Spacing size={spacing.sm} />
-            <ChipGroup>
-              {DAYS.filter((d) => trainingDays.includes(d.value)).map((day) => (
-                <Chip
-                  key={day.value}
-                  selected={longRunDay === day.value}
-                  onClick={() => setLongRunDay(day.value)}
-                >
-                  {day.label}
-                </Chip>
-              ))}
-            </ChipGroup>
-          </div>
-
-          {/* 체중 */}
-          <div css={formSectionStyle}>
-            <TextField
-              variant="box"
-              label="체중 (kg)"
-              labelOption="sustain"
-              type="number"
-              value={bodyWeight}
-              onChange={(e) => setBodyWeight(e.target.value)}
+        <List>
+          <ListRow
+            contents={
+              <ListRow.Texts
+                type="1RowTypeA"
+                top="목표 대회"
+                topProps={{ color: adaptive.grey800 }}
+              />
+            }
+            right={
+              <ListRow.Texts
+                type="Right1RowTypeA"
+                top={eventLabel}
+                topProps={{ color: adaptive.grey700 }}
+              />
+            }
+            verticalPadding="large"
+          />
+          <ListRow
+            contents={
+              <ListRow.Texts
+                type="1RowTypeA"
+                top="목표 기록"
+                topProps={{ color: adaptive.grey800 }}
+              />
+            }
+            right={
+              <ListRow.Texts
+                type="Right1RowTypeA"
+                top={`${time.h}시간 ${time.m}분 ${time.s}초`}
+                topProps={{ color: adaptive.grey700 }}
+              />
+            }
+            verticalPadding="large"
+          />
+          <ListRow
+            contents={
+              <ListRow.Texts
+                type="1RowTypeA"
+                top="대회 날짜"
+                topProps={{ color: adaptive.grey800 }}
+              />
+            }
+            right={
+              <ListRow.Texts
+                type="Right1RowTypeA"
+                top={profile.targetDate}
+                topProps={{ color: adaptive.grey700 }}
+              />
+            }
+            verticalPadding="large"
+          />
+          <ListRow
+            contents={
+              <ListRow.Texts
+                type="1RowTypeA"
+                top="훈련 요일"
+                topProps={{ color: adaptive.grey800 }}
+              />
+            }
+            right={
+              <ListRow.Texts
+                type="Right1RowTypeA"
+                top={trainingDaysLabel}
+                topProps={{ color: adaptive.grey700 }}
+              />
+            }
+            verticalPadding="large"
+          />
+          <ListRow
+            contents={
+              <ListRow.Texts
+                type="1RowTypeA"
+                top="롱런 요일"
+                topProps={{ color: adaptive.grey800 }}
+              />
+            }
+            right={
+              <ListRow.Texts
+                type="Right1RowTypeA"
+                top={longRunDayLabel}
+                topProps={{ color: adaptive.grey700 }}
+              />
+            }
+            verticalPadding="large"
+          />
+          <ListRow
+            contents={
+              <ListRow.Texts
+                type="1RowTypeA"
+                top="체중"
+                topProps={{ color: adaptive.grey800 }}
+              />
+            }
+            right={
+              <ListRow.Texts
+                type="Right1RowTypeA"
+                top={`${profile.bodyWeight} kg`}
+                topProps={{ color: adaptive.grey700 }}
+              />
+            }
+            verticalPadding="large"
+          />
+          {profile.targetWeight != null && (
+            <ListRow
+              contents={
+                <ListRow.Texts
+                  type="1RowTypeA"
+                  top="목표 체중"
+                  topProps={{ color: adaptive.grey800 }}
+                />
+              }
+              right={
+                <ListRow.Texts
+                  type="Right1RowTypeA"
+                  top={`${profile.targetWeight} kg`}
+                  topProps={{ color: adaptive.grey700 }}
+                />
+              }
+              verticalPadding="large"
             />
-          </div>
-
-          {/* 목표 체중 */}
-          <div css={formSectionStyle}>
-            <TextField
-              variant="box"
-              label="레이스 목표 체중 (선택)"
-              labelOption="sustain"
-              type="number"
-              value={targetWeight}
-              onChange={(e) => setTargetWeight(e.target.value)}
-              placeholder="예: 62.0"
-            />
-          </div>
-
-          {error && (
-            <>
-              <Paragraph typography="st7" color="danger">{error}</Paragraph>
-              <Spacing size={spacing.md} />
-            </>
           )}
+        </List>
 
-          <Button display="block" size="large" onClick={handleSave} loading={saving}>
-            저장
-          </Button>
-          <Spacing size={spacing.md} />
-          <Button display="block" size="large" variant="weak" onClick={handleCancel}>
-            취소
-          </Button>
-          <Spacing size={spacing.xxl} />
-        </>
+        {success && (
+          <>
+            <Spacing size={spacing.sm} />
+            <Paragraph typography="st7" css={css`color: ${color.success};`}>저장 완료!</Paragraph>
+          </>
+        )}
+
+        {isGuest && (
+          <>
+            <Spacing size={spacing.sm} />
+            <Paragraph typography="st8" color="secondary">
+              게스트 모드로 사용 중입니다. 로그인하면 데이터가 저장됩니다.
+            </Paragraph>
+          </>
+        )}
+
+        <Spacing size={spacing.xxl} />
+        <Button display="block" size="large" onClick={() => setEditing(true)}>
+          수정하기
+        </Button>
+        <Spacing size={spacing.md} />
+        <div css={logoutRowStyle}>
+          {isGuest ? (
+            <TextButton size="medium" variant="underline" onClick={handleLogout}>
+              로그인하기
+            </TextButton>
+          ) : (
+            <TextButton size="medium" variant="underline" onClick={handleLogout}>
+              로그아웃
+            </TextButton>
+          )}
+        </div>
+      </div>
+
+      {/* 편집 모드 - 위자드 오버레이 */}
+      {editing && (
+        <div css={wizardOverlayStyle}>
+          <ProfileWizard
+            mode="edit"
+            initialData={profileToWizardData(profile)}
+            onComplete={handleWizardComplete}
+            onCancel={handleCancel}
+          />
+        </div>
       )}
-    </div>
+    </>
   );
 }
-
-const profileCardStyle = css`
-  background: ${color.bgCard};
-  border-radius: ${radius.card}px;
-  padding: ${spacing.xs}px ${spacing.xl}px;
-`;
-
-const profileRowStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: ${spacing.md}px 0;
-  border-bottom: 1px solid ${color.border};
-`;
-
-const profileRowLastStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: ${spacing.md}px 0;
-`;
 
 const logoutRowStyle = css`
   display: flex;
   justify-content: center;
   padding: ${spacing.sm}px 0;
+`;
+
+const wizardOverlayStyle = css`
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: ${color.bgPage};
 `;

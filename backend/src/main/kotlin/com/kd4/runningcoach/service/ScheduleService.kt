@@ -266,15 +266,15 @@ class ScheduleService(
             val dietEndDate = targetDate.minusDays(7)
             val days = ChronoUnit.DAYS.between(today, dietEndDate).toInt().coerceAtLeast(0)
             weightToLose = bodyWeight - targetWeight
-            val totalDeficitCal = (weightToLose * 7700).toInt()
-            val rawDeficit = if (days > 0) totalDeficitCal / days else 0
-
-            val noDeficitToday = typeToday == "INTERVAL" || isHighIntensityTomorrow
-            dailyDeficit = if (noDeficitToday) 0 else rawDeficit.coerceAtMost(500)
             dietDaysRemaining = days
+
+            // 롱런 전날에만 적자 면제
+            val isBeforeLongRun = typeTomorrow == "LONG"
+            dailyDeficit = if (isBeforeLongRun) 0 else 500
         }
 
-        val totalRecommended = bmr + intensityBonus + tomorrowPrep - dailyDeficit
+        // BMR를 최저선으로 보장
+        val totalRecommended = maxOf(bmr, bmr + intensityBonus + tomorrowPrep - dailyDeficit)
 
         return CaloriesDto(
             bmr = bmr,

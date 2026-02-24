@@ -82,13 +82,8 @@ export default function Today() {
             </div>
             <Spacing size={spacing.md} />
             <Paragraph typography="t4" css={workoutDetailsStyle}>
-              {workout.distanceKm} km
-              {workout.paceTarget && (
-                <>
-                  <span css={workoutSepStyle}>|</span>
-                  {workout.paceTarget} /km
-                </>
-              )}
+              {`${workout.distanceKm}km`}
+              {workout.paceTarget && ` | ${workout.paceTarget}/km`}
             </Paragraph>
             {workout.description && (
               <>
@@ -111,18 +106,18 @@ export default function Today() {
       <div css={caloriesCardStyle}>
         <Paragraph typography="st7" color="secondary">오늘의 칼로리</Paragraph>
         <Spacing size={spacing.xs} />
-        <Paragraph typography="t4" css={css`color: ${color.primary}; font-weight: 700;`}>
+        <Paragraph typography="t4" css={css`color: ${color.primary}; font-weight: 1000;`}>
           {data.calories.totalRecommended.toLocaleString()} kcal
         </Paragraph>
         <Spacing size={spacing.md} />
 
         <div css={calRowStyle}>
           <Paragraph typography="st8" color="secondary">기초대사량 (BMR)</Paragraph>
-          <Paragraph typography="st8">{data.calories.bmr} kcal</Paragraph>
+          <Paragraph typography="st8">{`${data.calories.bmr} kcal`}</Paragraph>
         </div>
         <div css={calRowStyle}>
           <Paragraph typography="st8" color="secondary">운동 강도 보너스</Paragraph>
-          <Paragraph typography="st8">+{data.calories.intensityBonus} kcal</Paragraph>
+          <Paragraph typography="st8">{`+${data.calories.intensityBonus} kcal`}</Paragraph>
         </div>
         {data.calories.tomorrowPrep > 0 && (
           <div css={calRowStyle}>
@@ -133,7 +128,7 @@ export default function Today() {
         {data.calories.dailyDeficit > 0 && (
           <div css={calRowStyle}>
             <Paragraph typography="st8" color="secondary">감량 적자</Paragraph>
-            <Paragraph typography="st8" css={css`color: ${color.danger};`}>-{data.calories.dailyDeficit} kcal</Paragraph>
+            <Paragraph typography="st8" css={css`color: ${color.danger};`}>{`-${data.calories.dailyDeficit} kcal`}</Paragraph>
           </div>
         )}
 
@@ -167,7 +162,7 @@ export default function Today() {
               {showDietTip && (
                 <div css={dietTipBubbleStyle}>
                   <span css={dietTipTextStyle}>
-                    훈련 중 급격한 감량은 부상 위험을 높여요. 하루 500kcal 적자로 안전하게 감량하는 걸 권장해요.
+                    {`훈련 중 급격한 감량은 부상 위험을 높여요.\n하루 500kcal 적자로 안전하게 감량하는 걸 권장해요.`}
                   </span>
                 </div>
               )}
@@ -176,19 +171,19 @@ export default function Today() {
               <div css={css`padding-top: ${spacing.sm}px;`}>
                 <div css={calRowStyle}>
                   <Paragraph typography="st8" color="secondary">목표 체중</Paragraph>
-                  <Paragraph typography="st8">{data.calories.targetWeight} kg</Paragraph>
+                  <Paragraph typography="st8">{`${data.calories.targetWeight} kg`}</Paragraph>
                 </div>
                 <div css={calRowStyle}>
                   <Paragraph typography="st8" color="secondary">감량 필요</Paragraph>
-                  <Paragraph typography="st8">{data.calories.weightToLose.toFixed(1)} kg</Paragraph>
+                  <Paragraph typography="st8">{`${data.calories.weightToLose.toFixed(1)} kg`}</Paragraph>
                 </div>
                 <div css={calRowStyle}>
                   <Paragraph typography="st8" color="secondary">일일 적자</Paragraph>
-                  <Paragraph typography="st8" css={css`color: ${color.danger};`}>-{data.calories.dailyDeficit} kcal</Paragraph>
+                  <Paragraph typography="st8" css={css`color: ${color.danger};`}>{`-${data.calories.dailyDeficit} kcal`}</Paragraph>
                 </div>
                 <div css={calRowStyle}>
                   <Paragraph typography="st8" color="secondary">남은 기간</Paragraph>
-                  <Paragraph typography="st8">D-{data.calories.dietDaysRemaining}</Paragraph>
+                  <Paragraph typography="st8">{`D-${data.calories.dietDaysRemaining}`}</Paragraph>
                 </div>
               </div>
             )}

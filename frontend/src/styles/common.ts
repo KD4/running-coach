@@ -41,15 +41,26 @@ export const dateInputStyle = css`
 
 export const timeInputsRowStyle = css`
   display: flex;
-  gap: ${spacing.md}px;
+  gap: 4px;
 `;
 
 export const timeFieldStyle = css`
   display: flex;
   align-items: center;
-  gap: ${spacing.xs}px;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
 `;
 
 export const timeInputWidthStyle = css`
-  width: 72px;
+  flex: 1;
+  min-width: 0;
+`;
+
+export const timeLabelStyle = css`
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: ${color.textSecondary};
+  margin-left: -8px;
 `;

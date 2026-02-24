@@ -12,5 +12,5 @@ export default function ChipGroup({ children }: ChipGroupProps) {
 const chipGroupStyle = css`
   display: flex;
   flex-wrap: wrap;
-  gap: ${spacing.sm}px;
+  gap: 6px;
 `;

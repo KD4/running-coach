@@ -73,7 +73,7 @@ export default function Schedule() {
       {/* 월 네비게이션 */}
       <div css={monthNavStyle}>
         <button css={navBtnStyle} onClick={prevMonth} aria-label="이전 달">&#8249;</button>
-        <Paragraph typography="st5">{year}년 {month}월</Paragraph>
+        <Paragraph typography="st5">{`${year}년 ${month}월`}</Paragraph>
         <button css={navBtnStyle} onClick={nextMonth} aria-label="다음 달">&#8250;</button>
       </div>
 
@@ -150,7 +150,7 @@ export default function Schedule() {
                   </div>
                   <Spacing size={spacing.sm} />
                   <Paragraph typography="st6">
-                    {selected.workout.distanceKm} km
+                    {`${selected.workout.distanceKm} km`}
                     {selected.workout.paceTarget && ` | ${selected.workout.paceTarget}/km`}
                   </Paragraph>
                   {selected.workout.description && (

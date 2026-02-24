@@ -1,61 +1,61 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { appLogin } from '@apps-in-toss/web-bridge';
+import { oauthLogin } from '../api/auth';
 import { submitOnboarding } from '../api/user';
-import { useAuth } from '../contexts/AuthContext';
-import { Button, Paragraph, Spacing, TextField, Top } from '@toss/tds-mobile';
+import { useAuth, GUEST_MODE_ENABLED } from '../contexts/AuthContext';
+import { Button, Paragraph, Spacing } from '@toss/tds-mobile';
 import { css } from '@emotion/react';
-import { DAYS, EVENTS } from '../constants/workout';
 import { spacing } from '../styles/tokens';
-import { pageStyle, formSectionStyle, dateInputStyle, timeInputsRowStyle, timeFieldStyle, timeInputWidthStyle } from '../styles/common';
-import Chip from '../components/Chip';
-import ChipGroup from '../components/ChipGroup';
+import ProfileWizard from '../components/wizard/ProfileWizard';
+import type { WizardFormData } from '../components/wizard/types';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { isGuest, setOnboarded, setGuestProfile } = useAuth();
-  const [goalEvent, setGoalEvent] = useState('10K');
-  const [goalHours, setGoalHours] = useState('0');
-  const [goalMinutes, setGoalMinutes] = useState('50');
-  const [goalSeconds, setGoalSeconds] = useState('0');
-  const [targetDate, setTargetDate] = useState('');
-  const [trainingDays, setTrainingDays] = useState<string[]>(['TUE', 'THU', 'SAT']);
-  const [longRunDay, setLongRunDay] = useState('SAT');
-  const [bodyWeight, setBodyWeight] = useState('70');
-  const [targetWeight, setTargetWeight] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { token, isGuest, login, loginAsGuest, setOnboarded, setGuestProfile } = useAuth();
+  const isAuthenticated = !!token || isGuest;
+  const [showIntro, setShowIntro] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  const toggleDay = (day: string) => {
-    setTrainingDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
+  /* ─── 인트로: 로그인/게스트 선택 ─── */
+
+  const handleTossLogin = async () => {
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const { authorizationCode, referrer } = await appLogin();
+      const res = await oauthLogin('toss', authorizationCode, referrer);
+      login(res.token, res.isNewUser);
+      if (res.isNewUser) {
+        setShowIntro(false);
+      } else {
+        navigate('/today', { replace: true });
+      }
+    } catch {
+      setLoginError('로그인에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const handleGuestStart = () => {
+    loginAsGuest();
+    setShowIntro(false);
+  };
 
-    if (trainingDays.length < 3) {
-      setError('최소 3일 이상의 훈련일을 선택해주세요.');
-      return;
-    }
-    if (!trainingDays.includes(longRunDay)) {
-      setError('롱런 요일은 훈련일에 포함되어야 합니다.');
-      return;
-    }
-    if (!targetDate) {
-      setError('대회 날짜를 선택해주세요.');
-      return;
-    }
+  /* ─── 위자드: 프로필 설정 ─── */
 
+  const handleComplete = async (data: WizardFormData) => {
     const profileData = {
-      goalEvent,
-      goalTimeSeconds: Number(goalHours) * 3600 + Number(goalMinutes) * 60 + Number(goalSeconds),
-      targetDate,
-      trainingDays,
-      longRunDay,
-      bodyWeight: Number(bodyWeight),
-      targetWeight: targetWeight ? Number(targetWeight) : null,
+      goalEvent: data.goalEvent,
+      goalTimeSeconds:
+        Number(data.goalHours) * 3600 + Number(data.goalMinutes) * 60 + Number(data.goalSeconds),
+      targetDate: data.targetDate,
+      trainingDays: data.trainingDays,
+      longRunDay: data.longRunDay,
+      bodyWeight: Number(data.bodyWeight),
+      targetWeight: data.targetWeight ? Number(data.targetWeight) : null,
     };
 
     if (isGuest) {
@@ -65,187 +65,93 @@ export default function Onboarding() {
       return;
     }
 
-    setLoading(true);
-    try {
-      await submitOnboarding(profileData);
-      setOnboarded();
-      navigate('/today', { replace: true });
-    } catch {
-      setError('저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
-    }
+    await submitOnboarding(profileData);
+    setOnboarded();
+    navigate('/today', { replace: true });
   };
 
+  const handleCancel = () => {
+    setShowIntro(true);
+  };
+
+  /* ─── 인트로 화면 ─── */
+  if (showIntro) {
+    return (
+      <div css={introPageStyle}>
+        <div css={introContainerStyle}>
+          <div css={logoStyle}>🏃</div>
+          <Spacing size={8} />
+          <Paragraph typography="t4">러닝 코치</Paragraph>
+          <Spacing size={8} />
+          <Paragraph typography="st6" color="secondary">
+            당신만의 맞춤 러닝 훈련 플랜
+          </Paragraph>
+          <Spacing size={32} />
+          {isAuthenticated ? (
+            <Button
+              display="block"
+              size="xlarge"
+              onClick={() => setShowIntro(false)}
+            >
+              시작하기
+            </Button>
+          ) : (
+            <>
+              {loginError && (
+                <>
+                  <Paragraph typography="st6" color="danger">{loginError}</Paragraph>
+                  <Spacing size={12} />
+                </>
+              )}
+              <Button
+                display="block"
+                size="xlarge"
+                onClick={handleTossLogin}
+                loading={loginLoading}
+              >
+                토스로 시작하기
+              </Button>
+              {GUEST_MODE_ENABLED && (
+                <>
+                  <Spacing size={spacing.md} />
+                  <Button
+                    display="block"
+                    size="xlarge"
+                    variant="weak"
+                    onClick={handleGuestStart}
+                  >
+                    로그인 없이 시작하기
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── 위자드 화면 ─── */
   return (
-    <div css={onboardingPageStyle}>
-      <Top
-        upperGap={8}
-        lowerGap={spacing.xxl}
-        title={<Top.TitleParagraph>훈련 프로필 설정</Top.TitleParagraph>}
-        subtitleBottom={
-          <Top.SubtitleParagraph>
-            맞춤 훈련 플랜을 위한 정보를 입력해주세요
-          </Top.SubtitleParagraph>
-        }
-      />
-
-      <form onSubmit={handleSubmit} css={onboardingFormStyle}>
-        {/* 목표 대회 */}
-        <div css={formSectionStyle}>
-          <Paragraph typography="st6" color="secondary">목표 대회</Paragraph>
-          <Spacing size={spacing.sm} />
-          <ChipGroup>
-            {EVENTS.map((ev) => (
-              <Chip
-                key={ev.value}
-                selected={goalEvent === ev.value}
-                onClick={() => setGoalEvent(ev.value)}
-              >
-                {ev.label}
-              </Chip>
-            ))}
-          </ChipGroup>
-        </div>
-
-        {/* 목표 기록 */}
-        <div css={formSectionStyle}>
-          <Paragraph typography="st6" color="secondary">목표 기록</Paragraph>
-          <Spacing size={spacing.sm} />
-          <div css={timeInputsRowStyle}>
-            <div css={timeFieldStyle}>
-              <TextField
-                variant="box"
-                type="number"
-                value={goalHours}
-                onChange={(e) => setGoalHours(e.target.value)}
-                css={timeInputWidthStyle}
-              />
-              <Paragraph typography="st6" color="secondary">시간</Paragraph>
-            </div>
-            <div css={timeFieldStyle}>
-              <TextField
-                variant="box"
-                type="number"
-                value={goalMinutes}
-                onChange={(e) => setGoalMinutes(e.target.value)}
-                css={timeInputWidthStyle}
-              />
-              <Paragraph typography="st6" color="secondary">분</Paragraph>
-            </div>
-            <div css={timeFieldStyle}>
-              <TextField
-                variant="box"
-                type="number"
-                value={goalSeconds}
-                onChange={(e) => setGoalSeconds(e.target.value)}
-                css={timeInputWidthStyle}
-              />
-              <Paragraph typography="st6" color="secondary">초</Paragraph>
-            </div>
-          </div>
-        </div>
-
-        {/* 대회 날짜 */}
-        <div css={formSectionStyle}>
-          <Paragraph typography="st6" color="secondary">대회 날짜</Paragraph>
-          <Spacing size={spacing.sm} />
-          <input
-            type="date"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
-            css={dateInputStyle}
-          />
-        </div>
-
-        {/* 훈련 요일 */}
-        <div css={formSectionStyle}>
-          <Paragraph typography="st6" color="secondary">훈련 요일 (3일 이상)</Paragraph>
-          <Spacing size={spacing.sm} />
-          <ChipGroup>
-            {DAYS.map((day) => (
-              <Chip
-                key={day.value}
-                selected={trainingDays.includes(day.value)}
-                onClick={() => toggleDay(day.value)}
-              >
-                {day.label}
-              </Chip>
-            ))}
-          </ChipGroup>
-        </div>
-
-        {/* 롱런 요일 */}
-        <div css={formSectionStyle}>
-          <Paragraph typography="st6" color="secondary">롱런 요일</Paragraph>
-          <Spacing size={spacing.sm} />
-          <ChipGroup>
-            {DAYS.filter((d) => trainingDays.includes(d.value)).map((day) => (
-              <Chip
-                key={day.value}
-                selected={longRunDay === day.value}
-                onClick={() => setLongRunDay(day.value)}
-              >
-                {day.label}
-              </Chip>
-            ))}
-          </ChipGroup>
-        </div>
-
-        {/* 체중 */}
-        <div css={formSectionStyle}>
-          <TextField
-            variant="box"
-            label="체중 (kg)"
-            labelOption="sustain"
-            type="number"
-            value={bodyWeight}
-            onChange={(e) => setBodyWeight(e.target.value)}
-          />
-        </div>
-
-        {/* 레이스 목표 체중 */}
-        <div css={formSectionStyle}>
-          <TextField
-            variant="box"
-            label="레이스 목표 체중 (선택)"
-            labelOption="sustain"
-            type="number"
-            value={targetWeight}
-            onChange={(e) => setTargetWeight(e.target.value)}
-            placeholder="예: 62.0"
-          />
-        </div>
-
-        {error && (
-          <>
-            <Paragraph typography="st6" color="danger">{error}</Paragraph>
-            <Spacing size={spacing.md} />
-          </>
-        )}
-
-        <Spacing size={spacing.sm} />
-        <Button
-          type="submit"
-          display="block"
-          size="xlarge"
-          loading={loading}
-        >
-          훈련 시작하기
-        </Button>
-        <Spacing size={spacing.xxl} />
-      </form>
-    </div>
+    <ProfileWizard mode="create" onComplete={handleComplete} onCancel={handleCancel} />
   );
 }
 
-const onboardingPageStyle = css`
-  ${pageStyle};
-  min-height: 100dvh;
+const introPageStyle = css`
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 20px;
 `;
 
-const onboardingFormStyle = css`
-  flex: 1;
+const introContainerStyle = css`
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+`;
+
+const logoStyle = css`
+  font-size: 4rem;
+  margin-bottom: 8px;
 `;
