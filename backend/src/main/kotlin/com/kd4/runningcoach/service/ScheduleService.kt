@@ -35,16 +35,20 @@ class ScheduleService(
     // === 핵심 계산 로직 (ProfileData 기반) ===
 
     private fun calculateToday(data: ProfileData, date: LocalDate): TodayResponse {
-        val totalWeeks = paceCalculator.defaultTotalWeeks(data.goalEvent)
-        val currentWeek = calculateCurrentWeek(data.targetDate, totalWeeks, date)
+        val planSelection = paceCalculator.determinePlanType(data.targetDate, date)
+        val totalWeeks = planSelection.totalWeeks
+        val currentWeek = planSelection.currentWeek
         val plan = paceCalculator.generatePlan(data.goalTimeSeconds, data.goalEvent, totalWeeks)
 
         val workout = getWorkoutForDate(data, date, currentWeek, totalWeeks, plan)
 
         val distanceToday = workout?.distanceKm ?: 0.0
         val workoutTypeToday = workout?.workoutType
-        val tomorrowWeek = calculateCurrentWeek(data.targetDate, totalWeeks, date.plusDays(1))
-        val tomorrowWorkout = getWorkoutForDate(data, date.plusDays(1), tomorrowWeek, totalWeeks, plan)
+        val tomorrowSelection = paceCalculator.determinePlanType(data.targetDate, date.plusDays(1))
+        val tomorrowPlan = if (tomorrowSelection.totalWeeks != totalWeeks) {
+            paceCalculator.generatePlan(data.goalTimeSeconds, data.goalEvent, tomorrowSelection.totalWeeks)
+        } else plan
+        val tomorrowWorkout = getWorkoutForDate(data, date.plusDays(1), tomorrowSelection.currentWeek, tomorrowSelection.totalWeeks, tomorrowPlan)
         val distanceTomorrow = tomorrowWorkout?.distanceKm ?: 0.0
         val workoutTypeTomorrow = tomorrowWorkout?.workoutType
 
@@ -65,8 +69,6 @@ class ScheduleService(
     }
 
     private fun calculateMonthly(data: ProfileData, year: Int, month: Int): MonthlyScheduleResponse {
-        val totalWeeks = paceCalculator.defaultTotalWeeks(data.goalEvent)
-        val plan = paceCalculator.generatePlan(data.goalTimeSeconds, data.goalEvent, totalWeeks)
         val trainingDaysOfWeek = data.trainingDays.split(",").map { toDayOfWeek(it) }
 
         val startDate = LocalDate.of(year, month, 1)
@@ -75,13 +77,14 @@ class ScheduleService(
         val days = mutableListOf<ScheduleDayDto>()
         var current = startDate
         while (!current.isAfter(endDate)) {
-            val currentWeek = calculateCurrentWeek(data.targetDate, totalWeeks, current)
+            val planSelection = paceCalculator.determinePlanType(data.targetDate, current)
+            val plan = paceCalculator.generatePlan(data.goalTimeSeconds, data.goalEvent, planSelection.totalWeeks)
             val isTrainingDay = current.dayOfWeek in trainingDaysOfWeek
-            val workout = getWorkoutForDate(data, current, currentWeek, totalWeeks, plan)
+            val workout = getWorkoutForDate(data, current, planSelection.currentWeek, planSelection.totalWeeks, plan)
 
             days.add(ScheduleDayDto(
                 date = current,
-                weekNumber = currentWeek.coerceIn(1, totalWeeks),
+                weekNumber = planSelection.currentWeek.coerceIn(1, planSelection.totalWeeks),
                 workout = workout,
                 isRestDay = !isTrainingDay || workout?.workoutType == "REST",
                 isTrainingDay = isTrainingDay,
@@ -99,27 +102,30 @@ class ScheduleService(
         totalWeeks: Int,
         plan: List<PaceCalculator.WeeklyPlan>,
     ): WorkoutDto? {
+        // 대회일 이후는 빈값
+        if (date.isAfter(data.targetDate)) return null
+
         val trainingDaysList = data.trainingDays.split(",")
         val longRunDow = toDayOfWeek(data.longRunDay)
         val todayDow = date.dayOfWeek
         val trainingDows = trainingDaysList.map { toDayOfWeek(it) }
+        val vdotPaces = plan.firstOrNull()?.vdotPaces ?: return null
 
-        if (todayDow !in trainingDows) return null
-        if (currentWeek < 1 || currentWeek > totalWeeks) return null
-        if (date.isAfter(data.targetDate)) return null
-
-        val weekPlan = plan.find { it.weekNumber == currentWeek } ?: return null
-        val paces = weekPlan.paces
-
-        // 레이스 데이 오버라이드
-        if (todayDow == longRunDow && currentWeek == totalWeeks) {
+        // 레이스 데이 = targetDate 당일 (훈련일 여부 무관)
+        if (date == data.targetDate) {
             return WorkoutDto(
                 workoutType = "RACE",
                 distanceKm = paceCalculator.raceDistanceKm(data.goalEvent),
-                paceTarget = PaceCalculator.formatPace(paces.racePaceSec),
+                paceTarget = PaceCalculator.formatPace(vdotPaces.mPaceSec),
                 description = "레이스 데이!",
             )
         }
+
+        if (todayDow !in trainingDows) return null
+        if (currentWeek < 1 || currentWeek > totalWeeks) return null
+
+        val weekPlan = plan.find { it.weekNumber == currentWeek } ?: return null
+        val vp = weekPlan.vdotPaces
 
         // 훈련일을 요일 순서로 정렬, 롱런은 마지막
         val nonLongDays = trainingDaysList
@@ -131,20 +137,20 @@ class ScheduleService(
         val position = orderedDays.indexOf(todayDow)
         if (position < 0) return null
 
-        val pattern = getPattern(orderedDays.size, weekPlan.level)
+        val pattern = getPattern(orderedDays.size, weekPlan.level, weekPlan.phase)
         if (position >= pattern.size) return null
 
         return when (pattern[position]) {
             "EASY" -> WorkoutDto(
                 workoutType = "EASY",
                 distanceKm = weekPlan.easyRunKm,
-                paceTarget = PaceCalculator.formatPace(paces.jogPaceSec),
+                paceTarget = PaceCalculator.formatPace(vp.ePaceSec),
                 description = "편한 페이스 조깅",
             )
             "AR" -> WorkoutDto(
                 workoutType = "AR",
                 distanceKm = weekPlan.arRunKm,
-                paceTarget = PaceCalculator.formatPace(paces.arPaceSec),
+                paceTarget = PaceCalculator.formatPace(vp.ePaceSec),
                 description = "에어로빅 런 ${"%.1f".format(weekPlan.arRunKm)}km - 대화 가능한 편안한 페이스",
             )
             "ACTIVE_RECOVERY" -> {
@@ -152,7 +158,7 @@ class ScheduleService(
                 WorkoutDto(
                     workoutType = "ACTIVE_RECOVERY",
                     distanceKm = recoveryKm,
-                    paceTarget = PaceCalculator.formatPace(paces.jogPaceSec),
+                    paceTarget = PaceCalculator.formatPace(vp.ePaceSec),
                     description = "회복 조깅 ${recoveryKm}km - 가볍게 풀어주기",
                 )
             }
@@ -161,7 +167,7 @@ class ScheduleService(
                 WorkoutDto(
                     workoutType = "INTERVAL",
                     distanceKm = weekPlan.intervalTotalKm,
-                    paceTarget = PaceCalculator.formatPace(paces.intervalPaceSec),
+                    paceTarget = PaceCalculator.formatPace(vp.iPaceSec),
                     description = "워밍업 2km + ${spec.description()} + 쿨다운 1km",
                 )
             }
@@ -170,51 +176,164 @@ class ScheduleService(
                 WorkoutDto(
                     workoutType = "TEMPO",
                     distanceKm = weekPlan.tempoRunKm,
-                    paceTarget = PaceCalculator.formatPace(paces.tempoPaceSec),
+                    paceTarget = PaceCalculator.formatPace(vp.tPaceSec),
                     description = "워밍업 2km + 템포 ${"%.1f".format(tempoWork)}km + 쿨다운 1km",
                 )
             }
             "PACE_RUN" -> WorkoutDto(
                 workoutType = "PACE_RUN",
                 distanceKm = weekPlan.paceRunKm,
-                paceTarget = PaceCalculator.formatPace(paces.paceRunPaceSec),
+                paceTarget = PaceCalculator.formatPace(vp.mPaceSec),
                 description = "페이스런 ${"%.1f".format(weekPlan.paceRunKm)}km",
             )
             "LONG" -> WorkoutDto(
                 workoutType = "LONG",
                 distanceKm = weekPlan.longRunKm,
-                paceTarget = PaceCalculator.formatPace(paces.longRunPaceSec),
+                paceTarget = PaceCalculator.formatPace(vp.ePaceSec),
                 description = "롱런 ${weekPlan.longRunKm}km",
             )
             else -> null
         }
     }
 
-    private fun getPattern(dayCount: Int, level: PaceCalculator.Level): List<String> {
+    private fun getPattern(dayCount: Int, level: PaceCalculator.Level, phase: String): List<String> {
         val clamped = dayCount.coerceIn(3, 6)
-        val base = when (level) {
-            PaceCalculator.Level.BEGINNER -> when (clamped) {
-                3 -> listOf("EASY", "AR", "LONG")
-                4 -> listOf("AR", "EASY", "AR", "LONG")
-                5 -> listOf("AR", "EASY", "AR", "EASY", "LONG")
-                6 -> listOf("AR", "EASY", "AR", "EASY", "EASY", "LONG")
-                else -> listOf("EASY", "AR", "LONG")
+
+        // 페이즈에 따른 기본 패턴 결정
+        val base = when {
+            // 테이퍼: 모든 레벨 볼륨 축소, 강도 유지
+            phase == "TAPER" -> when (level) {
+                PaceCalculator.Level.BEGINNER -> when (clamped) {
+                    3 -> listOf("EASY", "EASY", "EASY")
+                    4 -> listOf("EASY", "EASY", "EASY", "EASY")
+                    5 -> listOf("EASY", "EASY", "EASY", "EASY", "EASY")
+                    else -> listOf("EASY", "EASY", "EASY", "EASY", "EASY", "EASY")
+                }
+                else -> when (clamped) {
+                    3 -> listOf("EASY", "TEMPO", "EASY")
+                    4 -> listOf("EASY", "TEMPO", "EASY", "EASY")
+                    5 -> listOf("EASY", "INTERVAL", "EASY", "TEMPO", "EASY")
+                    else -> listOf("EASY", "INTERVAL", "EASY", "TEMPO", "EASY", "EASY")
+                }
             }
-            PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
-                3 -> listOf("INTERVAL", "TEMPO", "LONG")
-                4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
-                5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
-                6 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
-                else -> listOf("INTERVAL", "TEMPO", "LONG")
+
+            // 회복: 볼륨 감소
+            phase == "RECOVERY" || phase == "CYCLE_RECOVERY" -> when (clamped) {
+                3 -> listOf("EASY", "AR", "EASY")
+                4 -> listOf("EASY", "AR", "EASY", "EASY")
+                5 -> listOf("EASY", "AR", "EASY", "EASY", "EASY")
+                else -> listOf("EASY", "AR", "EASY", "EASY", "EASY", "EASY")
             }
-            PaceCalculator.Level.ADVANCED -> when (clamped) {
-                3 -> listOf("INTERVAL", "TEMPO", "LONG")
-                4 -> listOf("INTERVAL", "EASY", "TEMPO", "LONG")
-                5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
-                6 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
-                else -> listOf("INTERVAL", "TEMPO", "LONG")
+
+            // 빌드업/베이스: E 위주 + 레벨에 따라 T/I 도입
+            phase in listOf("BUILD", "BASE") -> when (level) {
+                PaceCalculator.Level.BEGINNER -> when (clamped) {
+                    3 -> listOf("EASY", "AR", "LONG")
+                    4 -> listOf("AR", "EASY", "AR", "LONG")
+                    5 -> listOf("AR", "EASY", "AR", "EASY", "LONG")
+                    else -> listOf("AR", "EASY", "AR", "EASY", "EASY", "LONG")
+                }
+                PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
+                    3 -> listOf("AR", "TEMPO", "LONG")
+                    4 -> listOf("AR", "TEMPO", "EASY", "LONG")
+                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                }
+                PaceCalculator.Level.ADVANCED -> when (clamped) {
+                    3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                    4 -> listOf("INTERVAL", "EASY", "TEMPO", "LONG")
+                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                }
+            }
+
+            // 5주 사이클: 포커스별 패턴
+            phase == "CYCLE_SPEED" -> when (clamped) {
+                3 -> listOf("EASY", "INTERVAL", "LONG")
+                4 -> listOf("EASY", "INTERVAL", "EASY", "LONG")
+                5 -> listOf("AR", "INTERVAL", "EASY", "EASY", "LONG")
+                else -> listOf("AR", "INTERVAL", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+            }
+            phase == "CYCLE_THRESHOLD" -> when (clamped) {
+                3 -> listOf("EASY", "TEMPO", "LONG")
+                4 -> listOf("EASY", "TEMPO", "EASY", "LONG")
+                5 -> listOf("AR", "TEMPO", "EASY", "EASY", "LONG")
+                else -> listOf("AR", "TEMPO", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+            }
+            phase == "CYCLE_VO2MAX" -> when (clamped) {
+                3 -> listOf("EASY", "INTERVAL", "LONG")
+                4 -> listOf("EASY", "INTERVAL", "EASY", "LONG")
+                5 -> listOf("AR", "INTERVAL", "EASY", "EASY", "LONG")
+                else -> listOf("AR", "INTERVAL", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+            }
+            phase == "CYCLE_RACE_PACE" -> when (clamped) {
+                3 -> listOf("EASY", "PACE_RUN", "LONG")
+                4 -> listOf("EASY", "PACE_RUN", "EASY", "LONG")
+                5 -> listOf("AR", "PACE_RUN", "EASY", "EASY", "LONG")
+                else -> listOf("AR", "PACE_RUN", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+            }
+
+            // Develop: T 페이스 도입
+            phase == "DEVELOP" -> when (level) {
+                PaceCalculator.Level.BEGINNER -> when (clamped) {
+                    3 -> listOf("EASY", "TEMPO", "LONG")
+                    4 -> listOf("AR", "EASY", "TEMPO", "LONG")
+                    5 -> listOf("AR", "EASY", "TEMPO", "EASY", "LONG")
+                    else -> listOf("AR", "EASY", "TEMPO", "EASY", "ACTIVE_RECOVERY", "LONG")
+                }
+                PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
+                    3 -> listOf("TEMPO", "EASY", "LONG")
+                    4 -> listOf("AR", "TEMPO", "EASY", "LONG")
+                    5 -> listOf("AR", "TEMPO", "EASY", "EASY", "LONG")
+                    else -> listOf("AR", "TEMPO", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+                }
+                PaceCalculator.Level.ADVANCED -> when (clamped) {
+                    3 -> listOf("TEMPO", "EASY", "LONG")
+                    4 -> listOf("TEMPO", "EASY", "INTERVAL", "LONG")
+                    5 -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "LONG")
+                    else -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "ACTIVE_RECOVERY", "LONG")
+                }
+            }
+
+            // Peak: I 인터벌 추가, 고강도
+            phase == "PEAK" -> when (level) {
+                PaceCalculator.Level.BEGINNER -> when (clamped) {
+                    3 -> listOf("EASY", "TEMPO", "LONG")
+                    4 -> listOf("AR", "EASY", "TEMPO", "LONG")
+                    5 -> listOf("AR", "EASY", "TEMPO", "EASY", "LONG")
+                    else -> listOf("AR", "EASY", "TEMPO", "EASY", "ACTIVE_RECOVERY", "LONG")
+                }
+                PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
+                    3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                    4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
+                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                }
+                PaceCalculator.Level.ADVANCED -> when (clamped) {
+                    3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                    4 -> listOf("INTERVAL", "EASY", "TEMPO", "LONG")
+                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                }
+            }
+
+            // 기본 폴백
+            else -> when (level) {
+                PaceCalculator.Level.BEGINNER -> when (clamped) {
+                    3 -> listOf("EASY", "AR", "LONG")
+                    4 -> listOf("AR", "EASY", "AR", "LONG")
+                    5 -> listOf("AR", "EASY", "AR", "EASY", "LONG")
+                    else -> listOf("AR", "EASY", "AR", "EASY", "EASY", "LONG")
+                }
+                else -> when (clamped) {
+                    3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                    4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
+                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                }
             }
         }
+
         if (dayCount > 6) {
             return List(dayCount - 6) { "EASY" } + base
         }
@@ -289,11 +408,6 @@ class ScheduleService(
             tomorrowWorkoutType = workoutTypeTomorrow,
             carbLoadingRecommended = carbLoadingRecommended,
         )
-    }
-
-    private fun calculateCurrentWeek(targetDate: LocalDate, totalWeeks: Int, today: LocalDate): Int {
-        val weeksUntilTarget = ChronoUnit.WEEKS.between(today, targetDate).toInt()
-        return totalWeeks - weeksUntilTarget
     }
 
     private fun getProfileData(userId: Long): ProfileData {

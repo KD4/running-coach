@@ -26,7 +26,6 @@ class CaloriesCalculationTest {
 
     @BeforeEach
     fun setUp() {
-        // 게스트 메서드는 UserProfileRepository를 사용하지 않으므로 mock으로 충분
         val mockRepo = Mockito.mock(UserProfileRepository::class.java)
         service = ScheduleService(mockRepo, PaceCalculator())
     }
@@ -38,7 +37,7 @@ class CaloriesCalculationTest {
     /**
      * 마라톤 서브4 러너 기본 프로필.
      * 훈련일: 화,목,토 (3일), 롱런: 토요일, 체중 70kg.
-     * targetDate 기준으로 주차를 조절할 수 있다.
+     * targetDate를 10주 후로 설정하여 유효한 훈련 주차에 놓이게 함.
      */
     private fun baseProfile(
         targetDate: LocalDate = LocalDate.of(2026, 6, 1),
@@ -47,7 +46,7 @@ class CaloriesCalculationTest {
         bodyWeight: Double = 70.0,
         targetWeight: Double? = null,
         goalEvent: String = "MARATHON",
-        goalTimeSeconds: Int = 14400, // 4시간
+        goalTimeSeconds: Int = 14400,
     ) = ProfileData(
         goalEvent = goalEvent,
         goalTimeSeconds = goalTimeSeconds,
@@ -73,13 +72,13 @@ class CaloriesCalculationTest {
         @Test
         fun `BMR = 체중 x 24`() {
             val cal = getCalories(baseProfile(bodyWeight = 70.0), LocalDate.of(2026, 5, 1))
-            assertEquals(1680, cal.bmr) // 70 * 24
+            assertEquals(1680, cal.bmr)
         }
 
         @Test
         fun `체중 80kg의 BMR`() {
             val cal = getCalories(baseProfile(bodyWeight = 80.0), LocalDate.of(2026, 5, 1))
-            assertEquals(1920, cal.bmr) // 80 * 24
+            assertEquals(1920, cal.bmr)
         }
     }
 
@@ -92,7 +91,7 @@ class CaloriesCalculationTest {
         @Test
         fun `휴식일에는 운동 소모 칼로리가 0`() {
             // 월요일 = 훈련일 아님 (TUE,THU,SAT)
-            val monday = LocalDate.of(2026, 4, 6) // 월요일
+            val monday = LocalDate.of(2026, 4, 6)
             val cal = getCalories(baseProfile(), monday)
 
             assertAll(
@@ -103,12 +102,9 @@ class CaloriesCalculationTest {
         }
 
         @Test
-        fun `휴식일 총 권장 칼로리 = BMR(감량목표 없을 때)`() {
+        fun `휴식일 총 권장 칼로리는 BMR 이상`() {
             val monday = LocalDate.of(2026, 4, 6)
             val cal = getCalories(baseProfile(targetWeight = null), monday)
-
-            // 내일(화요일) 운동에 따라 tomorrowPrep이 붙을 수 있으므로
-            // totalRecommended >= bmr 확인
             assertTrue(cal.totalRecommended >= cal.bmr)
         }
     }
@@ -121,8 +117,7 @@ class CaloriesCalculationTest {
     inner class TrainingBurn {
         @Test
         fun `훈련 소모 = 거리 x 체중`() {
-            // 화요일 훈련일에 대한 칼로리
-            val tuesday = LocalDate.of(2026, 4, 7) // 화요일
+            val tuesday = LocalDate.of(2026, 4, 7)
             val profile = baseProfile(bodyWeight = 70.0)
             val today = getToday(profile, tuesday)
 
@@ -144,7 +139,7 @@ class CaloriesCalculationTest {
 
         @Test
         fun `REST일 때 intensityBonus = 0`() {
-            val monday = LocalDate.of(2026, 4, 6) // 월요일 = 휴식
+            val monday = LocalDate.of(2026, 4, 6)
             val cal = getCalories(baseProfile(), monday)
             assertEquals(0, cal.intensityBonus)
         }
@@ -158,12 +153,9 @@ class CaloriesCalculationTest {
     inner class TomorrowPrep {
         @Test
         fun `내일이 LONG이면 카브로딩 권장`() {
-            // 토요일이 롱런이면, 금요일에 카브로딩
-            // 하지만 금요일은 훈련일이 아님 → 내일(토) 롱런
-            val friday = LocalDate.of(2026, 4, 10) // 금요일
+            val friday = LocalDate.of(2026, 4, 10)
             val cal = getCalories(baseProfile(), friday)
 
-            // 내일이 토요일(롱런) → carbLoadingRecommended = true
             if (cal.tomorrowWorkoutType == "LONG") {
                 assertTrue(cal.carbLoadingRecommended)
                 assertTrue(cal.tomorrowPrep > 0)
@@ -172,11 +164,8 @@ class CaloriesCalculationTest {
 
         @Test
         fun `내일이 INTERVAL이면 카브로딩 권장`() {
-            // INTERMEDIATE 4일 패턴: AR, INTERVAL, TEMPO, LONG
-            // 4일 훈련으로 변경하여 INTERVAL이 포함되게
             val profile = baseProfile(trainingDays = "MON,TUE,THU,SAT", longRunDay = "SAT")
-            // 월요일 → 내일 화요일 = INTERVAL일 수 있음
-            val monday = LocalDate.of(2026, 4, 6) // 월요일
+            val monday = LocalDate.of(2026, 4, 6)
             val cal = getCalories(profile, monday)
 
             if (cal.tomorrowWorkoutType == "INTERVAL") {
@@ -186,8 +175,6 @@ class CaloriesCalculationTest {
 
         @Test
         fun `내일이 EASY면 카브로딩 불필요`() {
-            // 화,목,토 3일 패턴(INTERMEDIATE): INTERVAL, TEMPO, LONG
-            // 수요일 → 내일 목요일 = TEMPO
             val wednesday = LocalDate.of(2026, 4, 8)
             val cal = getCalories(baseProfile(), wednesday)
 
@@ -226,9 +213,8 @@ class CaloriesCalculationTest {
 
         @Test
         fun `감량 목표가 있으면 고정 500kcal 적자`() {
-            // 내일이 LONG이 아닌 날
             val profile = baseProfile(bodyWeight = 75.0, targetWeight = 70.0)
-            val wednesday = LocalDate.of(2026, 4, 8) // 수요일 → 내일 목요일(LONG 아님)
+            val wednesday = LocalDate.of(2026, 4, 8)
             val cal = getCalories(profile, wednesday)
 
             if (cal.tomorrowWorkoutType != "LONG") {
@@ -239,7 +225,6 @@ class CaloriesCalculationTest {
 
         @Test
         fun `롱런 전날은 적자 면제`() {
-            // 금요일 → 내일 토요일(롱런)
             val profile = baseProfile(bodyWeight = 75.0, targetWeight = 70.0)
             val friday = LocalDate.of(2026, 4, 10)
             val cal = getCalories(profile, friday)
@@ -251,7 +236,7 @@ class CaloriesCalculationTest {
 
         @Test
         fun `다이어트 남은 일수 = 대회 7일 전까지`() {
-            val targetDate = LocalDate.of(2026, 6, 1) // 대회일
+            val targetDate = LocalDate.of(2026, 6, 1)
             val today = LocalDate.of(2026, 5, 1)
             val profile = baseProfile(
                 targetDate = targetDate,
@@ -274,11 +259,7 @@ class CaloriesCalculationTest {
     inner class BmrSafetyFloor {
         @Test
         fun `총 권장 칼로리는 절대 BMR 이하로 내려가지 않는다`() {
-            // 감량 적자가 보너스보다 클 때도 BMR 보장
             val profile = baseProfile(bodyWeight = 55.0, targetWeight = 50.0)
-            // 월요일 = 휴식일 → trainingBurn=0, intensityBonus=0
-            // dailyDeficit=500, tomorrowPrep은 내일 운동에 따라 다름
-            // bmr + 0 + tomorrowPrep - 500 < bmr 가능
             val monday = LocalDate.of(2026, 4, 6)
             val cal = getCalories(profile, monday)
 
@@ -296,7 +277,6 @@ class CaloriesCalculationTest {
 
             if (!today.isRestDay) {
                 val cal = today.calories
-                // 적자 0, targetWeight null → total = bmr + intensityBonus + tomorrowPrep
                 assertTrue(
                     cal.totalRecommended >= cal.bmr + cal.intensityBonus,
                     "운동일 총 권장(${cal.totalRecommended}) >= bmr(${cal.bmr}) + bonus(${cal.intensityBonus})",

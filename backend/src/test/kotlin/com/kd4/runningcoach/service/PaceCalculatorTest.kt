@@ -4,16 +4,12 @@ import com.kd4.runningcoach.service.PaceCalculator.Level
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
+import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * PaceCalculator 학습 테스트
- *
- * 페이스 산정, 레벨 판별, 인터벌 스펙, 주간 플랜 생성 로직을 검증한다.
- */
 class PaceCalculatorTest {
 
     private val calc = PaceCalculator()
@@ -45,14 +41,12 @@ class PaceCalculatorTest {
     inner class DetermineLevel {
         @Test
         fun `9분 페이스 이상은 BEGINNER`() {
-            // 540초/km = 9:00/km
             assertEquals(Level.BEGINNER, calc.determineLevel(540))
             assertEquals(Level.BEGINNER, calc.determineLevel(600))
         }
 
         @Test
         fun `6분30초 미만은 ADVANCED`() {
-            // 390초/km = 6:30/km
             assertEquals(Level.ADVANCED, calc.determineLevel(389))
             assertEquals(Level.ADVANCED, calc.determineLevel(300))
         }
@@ -66,74 +60,55 @@ class PaceCalculatorTest {
     }
 
     // ──────────────────────────────────────────────
-    //  페이스 계산 — 마라톤 서브4 시나리오
+    //  VDOT 페이스 계산
     // ──────────────────────────────────────────────
 
     @Nested
-    inner class CalculatePaces {
+    inner class CalculateVdotPaces {
 
-        /** 마라톤 서브4 = 4시간(14400초) / 42.195km ≈ 341.3초/km */
-        private val sub4Paces = calc.calculatePaces(
-            goalTimeSeconds = 14400,   // 4시간
+        /** 마라톤 서브4 = 14400초 / 42.195km ≈ 341.3초/km */
+        private val sub4Vdot = calc.calculateVdotPaces(
+            goalTimeSeconds = 14400,
             goalEvent = "MARATHON",
         )
 
         @Test
-        fun `레이스 페이스는 목표시간 나누기 거리`() {
-            // 14400 / 42.195 ≈ 341.3 → 반올림 341
-            assertEquals(341, sub4Paces.racePaceSec)
+        fun `M 페이스 = 목표시간 나누기 거리`() {
+            assertEquals(341, sub4Vdot.mPaceSec)
         }
 
         @Test
-        fun `조깅 페이스 = 레이스 + 75초`() {
-            // 341.3 + 75 = 416.3 → 416
-            assertEquals(416, sub4Paces.jogPaceSec)
+        fun `E 페이스 = M + 75초`() {
+            assertEquals(416, sub4Vdot.ePaceSec)
         }
 
         @Test
-        fun `롱런 페이스 = 레이스 + 52초`() {
-            // 341.3 + 52 = 393.3 → 393
-            assertEquals(393, sub4Paces.longRunPaceSec)
+        fun `T 페이스 = M - 12초`() {
+            assertEquals(329, sub4Vdot.tPaceSec)
         }
 
         @Test
-        fun `템포 페이스 = 레이스 - 12초`() {
-            // 341.3 - 12 = 329.3 → 329
-            assertEquals(329, sub4Paces.tempoPaceSec)
+        fun `I 페이스 = M - 27초`() {
+            assertEquals(314, sub4Vdot.iPaceSec)
         }
 
         @Test
-        fun `인터벌 페이스 = 레이스 - 25초`() {
-            // 341.3 - 25 = 316.3 → 316
-            assertEquals(316, sub4Paces.intervalPaceSec)
-        }
-
-        @Test
-        fun `페이스런 페이스 = 레이스 + 15초`() {
-            // 341.3 + 15 = 356.3 → 356
-            assertEquals(356, sub4Paces.paceRunPaceSec)
-        }
-
-        @Test
-        fun `에어로빅런 페이스 = 레이스 + 62초`() {
-            // 341.3 + 62 = 403.3 → 403
-            assertEquals(403, sub4Paces.arPaceSec)
+        fun `R 페이스 = M - 43초`() {
+            assertEquals(298, sub4Vdot.rPaceSec)
         }
 
         @Test
         fun `10K 50분 페이스 계산`() {
-            // 3000초 / 10km = 300초/km (5:00/km)
-            val paces = calc.calculatePaces(3000, "10K")
-            assertEquals(300, paces.racePaceSec)
-            assertEquals(375, paces.jogPaceSec)       // 300 + 75
-            assertEquals(352, paces.longRunPaceSec)    // 300 + 52
+            val vdot = calc.calculateVdotPaces(3000, "10K")
+            assertEquals(300, vdot.mPaceSec)
+            assertEquals(375, vdot.ePaceSec)
+            assertEquals(288, vdot.tPaceSec)
         }
 
         @Test
         fun `하프 2시간 페이스 계산`() {
-            // 7200초 / 21.0975km ≈ 341.3초/km — 마라톤 서브4와 비슷한 페이스
-            val paces = calc.calculatePaces(7200, "HALF")
-            assertEquals(341, paces.racePaceSec)
+            val vdot = calc.calculateVdotPaces(7200, "HALF")
+            assertEquals(341, vdot.mPaceSec)
         }
     }
 
@@ -165,16 +140,12 @@ class PaceCalculatorTest {
 
         @Test
         fun `totalKm = 워밍업2km + 인터벌구간 + 쿨다운1km`() {
-            // 400m × 8회 + 200m × 7회 = 3200 + 1400 = 4600m = 4.6km
-            // total = 2.0 + 4.6 + 1.0 = 7.6km
             val spec = PaceCalculator.IntervalSpec(400, 8, 200)
             assertEquals(7.6, spec.totalKm())
         }
 
         @Test
         fun `1000m x 5회 400m 회복`() {
-            // 1000×5 + 400×4 = 5000 + 1600 = 6600m = 6.6km
-            // total = 2.0 + 6.6 + 1.0 = 9.6km
             val spec = PaceCalculator.IntervalSpec(1000, 5, 400)
             assertEquals(9.6, spec.totalKm())
         }
@@ -187,7 +158,306 @@ class PaceCalculatorTest {
     }
 
     // ──────────────────────────────────────────────
-    //  인터벌 스펙 — 주차별 / 레벨별 진행
+    //  determinePlanType — 통합 플랜 선택
+    // ──────────────────────────────────────────────
+
+    @Nested
+    inner class DeterminePlanTypeTest {
+
+        private val raceDay = LocalDate.of(2026, 6, 1)
+
+        @Test
+        fun `대회 3주 전 = 18주 플랜의 Week 16`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(3))
+            assertAll(
+                { assertEquals(18, sel.totalWeeks) },
+                { assertEquals(16, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `대회 10주 전 = 18주 플랜의 Week 9`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(10))
+            assertAll(
+                { assertEquals(18, sel.totalWeeks) },
+                { assertEquals(9, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `대회 18주 전 = 18주 플랜의 Week 1`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(18))
+            assertAll(
+                { assertEquals(18, sel.totalWeeks) },
+                { assertEquals(1, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `대회 1주 전 = 18주 플랜의 Week 18`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(1))
+            assertAll(
+                { assertEquals(18, sel.totalWeeks) },
+                { assertEquals(18, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `12주 → 13주 사이 전환 없이 주차 연속`() {
+            val at13 = calc.determinePlanType(raceDay, raceDay.minusWeeks(13))
+            val at12 = calc.determinePlanType(raceDay, raceDay.minusWeeks(12))
+            assertEquals(at13.currentWeek + 1, at12.currentWeek)
+            assertEquals(at13.totalWeeks, at12.totalWeeks)
+        }
+
+        // --- 통합 플랜: 19주+ = 5주 사이클 + 18주 메인 ---
+
+        @Test
+        fun `대회 19주 전 = 통합 23주 플랜, Week 5 (사이클 마지막)`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(19))
+            assertAll(
+                { assertEquals(23, sel.totalWeeks) },  // 5주 사이클 + 18주 메인
+                { assertEquals(5, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `대회 23주 전 = 통합 23주 플랜, Week 1`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(23))
+            assertAll(
+                { assertEquals(23, sel.totalWeeks) },
+                { assertEquals(1, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `대회 25주 전 = 통합 28주 플랜 (10주 사이클 + 18주 메인)`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(25))
+            assertAll(
+                { assertEquals(28, sel.totalWeeks) },  // ceil(7/5)*5 = 10 + 18
+                { assertEquals(4, sel.currentWeek) },   // 28-25+1 = 4
+            )
+        }
+
+        @Test
+        fun `대회 28주 전 = 통합 28주 플랜, Week 1`() {
+            val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(28))
+            assertAll(
+                { assertEquals(28, sel.totalWeeks) },
+                { assertEquals(1, sel.currentWeek) },
+            )
+        }
+
+        @Test
+        fun `5주 윈도우 내 totalWeeks 안정적`() {
+            // 19~23주 전: 모두 totalWeeks = 23
+            for (w in 19..23) {
+                val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(w.toLong()))
+                assertEquals(23, sel.totalWeeks, "대회 ${w}주 전 totalWeeks")
+            }
+            // 24~28주 전: 모두 totalWeeks = 28
+            for (w in 24..28) {
+                val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(w.toLong()))
+                assertEquals(28, sel.totalWeeks, "대회 ${w}주 전 totalWeeks")
+            }
+        }
+
+        @Test
+        fun `사이클 구간 내 currentWeek 연속 증가`() {
+            // 23주→22주→...→19주 = Week 1→2→...→5
+            for (w in 23 downTo 19) {
+                val sel = calc.determinePlanType(raceDay, raceDay.minusWeeks(w.toLong()))
+                assertEquals(23 - w + 1, sel.currentWeek, "대회 ${w}주 전 currentWeek")
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  determinePhase — 통합 플랜 페이즈 결정
+    // ──────────────────────────────────────────────
+
+    @Nested
+    inner class DeterminePhaseTest {
+
+        @Test
+        fun `18주 플랜 - 페이즈 분배`() {
+            assertEquals("BASE", calc.determinePhase(1, 18))
+            assertEquals("BASE", calc.determinePhase(6, 18))
+            assertEquals("DEVELOP", calc.determinePhase(7, 18))
+            assertEquals("DEVELOP", calc.determinePhase(12, 18))
+            assertEquals("PEAK", calc.determinePhase(13, 18))
+            assertEquals("PEAK", calc.determinePhase(16, 18))
+            assertEquals("TAPER", calc.determinePhase(17, 18))
+            assertEquals("TAPER", calc.determinePhase(18, 18))
+        }
+
+        @Test
+        fun `23주 플랜 - 사이클 5주 + 메인 18주`() {
+            // Week 1-5: 사이클
+            assertEquals("CYCLE_SPEED", calc.determinePhase(1, 23))
+            assertEquals("CYCLE_THRESHOLD", calc.determinePhase(2, 23))
+            assertEquals("CYCLE_VO2MAX", calc.determinePhase(3, 23))
+            assertEquals("CYCLE_RACE_PACE", calc.determinePhase(4, 23))
+            assertEquals("CYCLE_RECOVERY", calc.determinePhase(5, 23))
+            // Week 6-23: 메인 (mainWeek 1-18)
+            assertEquals("BASE", calc.determinePhase(6, 23))       // mainWeek 1
+            assertEquals("BASE", calc.determinePhase(11, 23))      // mainWeek 6
+            assertEquals("DEVELOP", calc.determinePhase(12, 23))   // mainWeek 7
+            assertEquals("DEVELOP", calc.determinePhase(17, 23))   // mainWeek 12
+            assertEquals("PEAK", calc.determinePhase(18, 23))      // mainWeek 13
+            assertEquals("PEAK", calc.determinePhase(21, 23))      // mainWeek 16
+            assertEquals("TAPER", calc.determinePhase(22, 23))     // mainWeek 17
+            assertEquals("TAPER", calc.determinePhase(23, 23))     // mainWeek 18
+        }
+
+        @Test
+        fun `28주 플랜 - 사이클 10주 반복 + 메인 18주`() {
+            // Week 1-5: 첫 번째 사이클
+            assertEquals("CYCLE_SPEED", calc.determinePhase(1, 28))
+            assertEquals("CYCLE_RECOVERY", calc.determinePhase(5, 28))
+            // Week 6-10: 두 번째 사이클 (반복)
+            assertEquals("CYCLE_SPEED", calc.determinePhase(6, 28))
+            assertEquals("CYCLE_RECOVERY", calc.determinePhase(10, 28))
+            // Week 11-28: 메인 18주
+            assertEquals("BASE", calc.determinePhase(11, 28))      // mainWeek 1
+            assertEquals("TAPER", calc.determinePhase(28, 28))     // mainWeek 18
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  18주 메인 플랜 — 다니엘스 주기화
+    // ──────────────────────────────────────────────
+
+    @Nested
+    inner class MainPlan {
+
+        private val plans = calc.generatePlan(
+            goalTimeSeconds = 14400,   // 서브4 마라톤
+            goalEvent = "MARATHON",
+            totalWeeks = 18,
+        )
+
+        @Test
+        fun `총 18주 플랜 생성`() {
+            assertEquals(18, plans.size)
+        }
+
+        @Test
+        fun `서브4 마라톤은 ADVANCED`() {
+            plans.forEach { assertEquals(Level.ADVANCED, it.level) }
+        }
+
+        @Test
+        fun `페이즈 순서 — Base, Develop, Peak, Taper`() {
+            val phases = plans.map { it.phase }
+            assertEquals("BASE", phases.first())
+            assertEquals("TAPER", phases.last())
+            assertTrue(phases.contains("DEVELOP"), "DEVELOP 포함")
+            assertTrue(phases.contains("PEAK"), "PEAK 포함")
+        }
+
+        @Test
+        fun `Base 1~6, Develop 7~12, Peak 13~16, Taper 17~18`() {
+            (1..6).forEach { assertEquals("BASE", plans[it - 1].phase, "week $it") }
+            (7..12).forEach { assertEquals("DEVELOP", plans[it - 1].phase, "week $it") }
+            (13..16).forEach { assertEquals("PEAK", plans[it - 1].phase, "week $it") }
+            (17..18).forEach { assertEquals("TAPER", plans[it - 1].phase, "week $it") }
+        }
+
+        @Test
+        fun `테이퍼 주간은 볼륨 0_5`() {
+            val taperWeeks = plans.filter { it.phase == "TAPER" }
+            assertTrue(taperWeeks.isNotEmpty())
+            taperWeeks.forEach { assertEquals(0.5, it.volumeMultiplier) }
+        }
+
+        @Test
+        fun `VDOT 페이스가 모든 주에 동일`() {
+            val first = plans.first().vdotPaces
+            plans.forEach { assertEquals(first, it.vdotPaces) }
+        }
+
+        @Test
+        fun `BEGINNER는 인터벌 스펙이 null`() {
+            val beginnerPlans = calc.generatePlan(6000, "10K", 18)
+            beginnerPlans.forEach { assertNull(it.intervalSpec) }
+        }
+
+        @Test
+        fun `INTERMEDIATE는 인터벌 스펙이 존재`() {
+            val intermediatePlans = calc.generatePlan(18000, "MARATHON", 18)
+            intermediatePlans.forEach { plan ->
+                assertEquals(Level.INTERMEDIATE, plan.level)
+                assertNotNull(plan.intervalSpec, "week ${plan.weekNumber}")
+            }
+        }
+
+        @Test
+        fun `ADVANCED는 인터벌 스펙이 존재`() {
+            plans.forEach { plan ->
+                assertNotNull(plan.intervalSpec, "week ${plan.weekNumber}")
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  통합 플랜 — 사이클 + 메인
+    // ──────────────────────────────────────────────
+
+    @Nested
+    inner class UnifiedPlan {
+
+        // 23주 통합 플랜 (5주 사이클 + 18주 메인)
+        private val plans = calc.generatePlan(
+            goalTimeSeconds = 14400,
+            goalEvent = "MARATHON",
+            totalWeeks = 23,
+        )
+
+        @Test
+        fun `총 23주 플랜 생성`() {
+            assertEquals(23, plans.size)
+        }
+
+        @Test
+        fun `사이클 5주 페이즈`() {
+            assertEquals("CYCLE_SPEED", plans[0].phase)
+            assertEquals("CYCLE_THRESHOLD", plans[1].phase)
+            assertEquals("CYCLE_VO2MAX", plans[2].phase)
+            assertEquals("CYCLE_RACE_PACE", plans[3].phase)
+            assertEquals("CYCLE_RECOVERY", plans[4].phase)
+        }
+
+        @Test
+        fun `사이클 후 메인 플랜 시작`() {
+            assertEquals("BASE", plans[5].phase)      // week 6 = mainWeek 1
+            assertEquals("DEVELOP", plans[11].phase)   // week 12 = mainWeek 7
+            assertEquals("PEAK", plans[17].phase)      // week 18 = mainWeek 13
+            assertEquals("TAPER", plans[22].phase)     // week 23 = mainWeek 18
+        }
+
+        @Test
+        fun `회복 사이클 주 볼륨 감소`() {
+            assertEquals(0.7, plans[4].volumeMultiplier)
+        }
+
+        @Test
+        fun `사이클 주차 거리는 초반 BASE 수준으로 일정`() {
+            val cycleDistances = plans.take(5).map { it.easyRunKm }
+            // 모든 사이클 주차가 동일한 base 거리 (distanceWeek=3 기준)
+            assertTrue(cycleDistances.distinct().size <= 2, "사이클 주차 거리가 크게 다르지 않아야 함")
+        }
+
+        @Test
+        fun `메인 플랜 구간 롱런 점진 증가`() {
+            val mainLongRuns = plans.drop(5).take(12).map { it.longRunKm }  // BASE + DEVELOP
+            // 초반보다 후반 롱런이 길어야 함
+            assertTrue(mainLongRuns.last() >= mainLongRuns.first(), "롱런 점진 증가")
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  인터벌 스펙 — 주차별 / 레벨별
     // ──────────────────────────────────────────────
 
     @Nested
@@ -195,7 +465,7 @@ class PaceCalculatorTest {
 
         @Test
         fun `INTERMEDIATE 초반(1~4주) = 400m x 8`() {
-            val spec = calc.getIntervalSpec(week = 2, totalWeeks = 12, level = Level.INTERMEDIATE)
+            val spec = calc.getIntervalSpec(week = 2, totalWeeks = 18, level = Level.INTERMEDIATE)
             assertAll(
                 { assertEquals(400, spec.intervalDistanceM) },
                 { assertEquals(8, spec.reps) },
@@ -205,7 +475,7 @@ class PaceCalculatorTest {
 
         @Test
         fun `INTERMEDIATE 중반(5~8주) = 800m x 6`() {
-            val spec = calc.getIntervalSpec(week = 6, totalWeeks = 12, level = Level.INTERMEDIATE)
+            val spec = calc.getIntervalSpec(week = 6, totalWeeks = 18, level = Level.INTERMEDIATE)
             assertAll(
                 { assertEquals(800, spec.intervalDistanceM) },
                 { assertEquals(6, spec.reps) },
@@ -213,18 +483,8 @@ class PaceCalculatorTest {
         }
 
         @Test
-        fun `INTERMEDIATE 후반(9~12주) = 1000m x 5`() {
-            val spec = calc.getIntervalSpec(week = 10, totalWeeks = 16, level = Level.INTERMEDIATE)
-            assertAll(
-                { assertEquals(1000, spec.intervalDistanceM) },
-                { assertEquals(5, spec.reps) },
-            )
-        }
-
-        @Test
         fun `ADVANCED 초반 = 800m x 10`() {
-            // 8 * 1.2 = 9.6 → roundToInt = 10
-            val spec = calc.getIntervalSpec(week = 1, totalWeeks = 12, level = Level.ADVANCED)
+            val spec = calc.getIntervalSpec(week = 1, totalWeeks = 18, level = Level.ADVANCED)
             assertAll(
                 { assertEquals(800, spec.intervalDistanceM) },
                 { assertEquals(10, spec.reps) },
@@ -234,148 +494,52 @@ class PaceCalculatorTest {
 
         @Test
         fun `테이퍼 주간 - ADVANCED = 400m x 5`() {
-            // totalWeeks=12, week=11 → 11 > 12-2=10 → taper
-            val spec = calc.getIntervalSpec(week = 11, totalWeeks = 12, level = Level.ADVANCED)
+            val spec = calc.getIntervalSpec(week = 17, totalWeeks = 18, level = Level.ADVANCED)
             assertAll(
                 { assertEquals(400, spec.intervalDistanceM) },
                 { assertEquals(5, spec.reps) },
                 { assertEquals(130, spec.recoveryDistanceM) },
             )
         }
-
-        @Test
-        fun `테이퍼 주간 - INTERMEDIATE = 400m x 4`() {
-            val spec = calc.getIntervalSpec(week = 11, totalWeeks = 12, level = Level.INTERMEDIATE)
-            assertAll(
-                { assertEquals(400, spec.intervalDistanceM) },
-                { assertEquals(4, spec.reps) },
-                { assertEquals(200, spec.recoveryDistanceM) },
-            )
-        }
     }
 
     // ──────────────────────────────────────────────
-    //  주간 플랜 생성
+    //  대회 직전 등록 시나리오
     // ──────────────────────────────────────────────
 
     @Nested
-    inner class GeneratePlan {
-
-        /** 마라톤 서브4 = 14400초 / 42.195km ≈ 341초/km → ADVANCED (< 390) */
-        private val plans = calc.generatePlan(
-            goalTimeSeconds = 14400,
-            goalEvent = "MARATHON",
-            totalWeeks = 12,
-        )
+    inner class LateRegistration {
 
         @Test
-        fun `총 주차 수만큼 플랜 생성`() {
-            assertEquals(12, plans.size)
+        fun `대회 3주 전 등록 — 18주 플랜의 Week 16, PEAK 페이즈`() {
+            val raceDay = LocalDate.of(2026, 6, 1)
+            val today = raceDay.minusWeeks(3)
+            val sel = calc.determinePlanType(raceDay, today)
+            val plan = calc.generatePlan(14400, "MARATHON", sel.totalWeeks)
+            val weekPlan = plan.find { it.weekNumber == sel.currentWeek }!!
+            assertEquals("PEAK", weekPlan.phase)
         }
 
         @Test
-        fun `서브4 마라톤은 ADVANCED`() {
-            // 341초/km < 390 → ADVANCED
-            plans.forEach { assertEquals(Level.ADVANCED, it.level) }
+        fun `대회 1주 전 — 18주 플랜의 Week 18, TAPER 페이즈`() {
+            val raceDay = LocalDate.of(2026, 6, 1)
+            val today = raceDay.minusWeeks(1)
+            val sel = calc.determinePlanType(raceDay, today)
+            val plan = calc.generatePlan(14400, "MARATHON", sel.totalWeeks)
+            val weekPlan = plan.find { it.weekNumber == sel.currentWeek }!!
+            assertEquals("TAPER", weekPlan.phase)
+            assertEquals(0.5, weekPlan.volumeMultiplier)
         }
 
         @Test
-        fun `4주 블록 주기화 — 블록 포지션 순환`() {
-            // 1,2,3,4, 1,2,3,4, 1,2,3,4
-            val expectedPositions = (1..12).map { ((it - 1) % 4) + 1 }
-            assertEquals(expectedPositions, plans.map { it.blockPosition })
+        fun `대회 25주 전 등록 — 사이클 구간의 워크아웃`() {
+            val raceDay = LocalDate.of(2026, 6, 1)
+            val today = raceDay.minusWeeks(25)
+            val sel = calc.determinePlanType(raceDay, today)
+            val plan = calc.generatePlan(14400, "MARATHON", sel.totalWeeks)
+            val weekPlan = plan.find { it.weekNumber == sel.currentWeek }!!
+            // Week 4 = 사이클 4번째 (CYCLE_RACE_PACE)
+            assertTrue(weekPlan.phase.startsWith("CYCLE_"), "사이클 페이즈여야 함")
         }
-
-        @Test
-        fun `블록 1 = 적응(0_8배), 3 = 강화(1_1배), 4 = 회복(0_7배)`() {
-            val week1 = plans[0]  // blockPosition=1, blockNumber=0 → 0.8 * 1.0
-            val week3 = plans[2]  // blockPosition=3, blockNumber=0 → 1.1 * 1.0
-            val week4 = plans[3]  // blockPosition=4, blockNumber=0 → 0.7 * 1.0
-
-            assertEquals(0.8, week1.volumeMultiplier)
-            assertEquals(1.1, week3.volumeMultiplier)
-            assertEquals(0.7, week4.volumeMultiplier)
-        }
-
-        @Test
-        fun `블록 번호 증가에 따라 기반 배수 5퍼센트씩 증가`() {
-            // week 5 = blockPosition=1, blockNumber=1 → 0.8 * 1.05 = 0.84 → round1 = 0.8
-            val week5 = plans[4]
-            assertEquals(0.8, week5.volumeMultiplier)
-
-            // week 6 = blockPosition=2, blockNumber=1 → 1.0 * 1.05 = 1.05 → round1 = 1.1 (0.5 rounds up)
-            val week6 = plans[5]
-            assertEquals(1.1, week6.volumeMultiplier)
-        }
-
-        @Test
-        fun `테이퍼 주간은 볼륨 0_5`() {
-            // totalWeeks=12, taper = week > 10
-            val week11 = plans[10]
-            val week12 = plans[11]
-
-            assertEquals(0.5, week11.volumeMultiplier)
-            assertEquals(0.5, week12.volumeMultiplier)
-        }
-
-        @Test
-        fun `BEGINNER는 인터벌 스펙이 null`() {
-            // 10K 70분 → 4200/10 = 420초 (7:00/km) → 420 < 540 → INTERMEDIATE
-            // 10K 100분 → 6000/10 = 600초 → BEGINNER
-            val beginnerPlans = calc.generatePlan(6000, "10K", 8)
-            beginnerPlans.forEach { assertNull(it.intervalSpec) }
-        }
-
-        @Test
-        fun `INTERMEDIATE는 인터벌 스펙이 존재`() {
-            // 마라톤 5시간 → 18000/42.195 ≈ 427초 → INTERMEDIATE
-            val intermediatePlans = calc.generatePlan(18000, "MARATHON", 12)
-            intermediatePlans.forEach { plan ->
-                assertEquals(Level.INTERMEDIATE, plan.level)
-                assertNotNull(plan.intervalSpec, "week ${plan.weekNumber}에 intervalSpec이 없음")
-            }
-        }
-
-        @Test
-        fun `ADVANCED는 인터벌 스펙이 존재`() {
-            plans.forEach { plan ->
-                assertEquals(Level.ADVANCED, plan.level)
-                assertNotNull(plan.intervalSpec, "week ${plan.weekNumber}에 intervalSpec이 없음")
-            }
-        }
-
-        @Test
-        fun `롱런 거리는 주차가 진행될수록 증가하다가 볼륨 배수에 의해 조절됨`() {
-            // 회복주(position 4) 전까지의 첫 3주를 비교
-            val week1LongKm = plans[0].longRunKm // position 1, vol 0.8
-            val week2LongKm = plans[1].longRunKm // position 2, vol 1.0
-            val week3LongKm = plans[2].longRunKm // position 3, vol 1.1
-
-            // 기본 롱런 거리가 증가하므로 vol 배수를 감안해도 week2 > week1
-            assertTrue(
-                week2LongKm > week1LongKm,
-                "week2($week2LongKm) > week1($week1LongKm) 이어야 함",
-            )
-            assertTrue(
-                week3LongKm > week2LongKm,
-                "week3($week3LongKm) > week2($week2LongKm) 이어야 함",
-            )
-        }
-    }
-
-    // ──────────────────────────────────────────────
-    //  defaultTotalWeeks
-    // ──────────────────────────────────────────────
-
-    @Nested
-    inner class DefaultTotalWeeks {
-        @Test
-        fun `10K는 8주`() = assertEquals(8, calc.defaultTotalWeeks("10K"))
-
-        @Test
-        fun `HALF는 10주`() = assertEquals(10, calc.defaultTotalWeeks("HALF"))
-
-        @Test
-        fun `MARATHON은 12주`() = assertEquals(12, calc.defaultTotalWeeks("MARATHON"))
     }
 }

@@ -1,6 +1,8 @@
 package com.kd4.runningcoach.service
 
 import org.springframework.stereotype.Component
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -9,14 +11,17 @@ class PaceCalculator {
 
     enum class Level { BEGINNER, INTERMEDIATE, ADVANCED }
 
-    data class Paces(
-        val racePaceSec: Int,
-        val jogPaceSec: Int,
-        val longRunPaceSec: Int,
-        val tempoPaceSec: Int,
-        val intervalPaceSec: Int,
-        val paceRunPaceSec: Int,
-        val arPaceSec: Int,
+    data class PlanSelection(
+        val totalWeeks: Int,
+        val currentWeek: Int,
+    )
+
+    data class VdotPaces(
+        val ePaceSec: Int,   // Easy
+        val mPaceSec: Int,   // Marathon
+        val tPaceSec: Int,   // Threshold
+        val iPaceSec: Int,   // Interval
+        val rPaceSec: Int,   // Repetition
     )
 
     data class IntervalSpec(
@@ -35,7 +40,7 @@ class PaceCalculator {
 
     data class WeeklyPlan(
         val weekNumber: Int,
-        val paces: Paces,
+        val vdotPaces: VdotPaces,
         val level: Level,
         val longRunKm: Double,
         val easyRunKm: Double,
@@ -44,9 +49,51 @@ class PaceCalculator {
         val arRunKm: Double,
         val intervalSpec: IntervalSpec?,
         val intervalTotalKm: Double,
-        val blockPosition: Int,
+        val phase: String,
         val volumeMultiplier: Double,
     )
+
+    /**
+     * 대회까지 남은 주수에 따라 통합 플랜의 totalWeeks와 currentWeek을 결정한다.
+     *
+     * - 18주 이하: 순수 18주 메인 플랜 (currentWeek = 18 - weeksToRace + 1)
+     * - 19주+: 5주 순환 사이클 + 18주 메인 플랜 통합
+     *   cycleWeeks = ceil((weeksToRace - 18) / 5) * 5  (5주 단위 올림)
+     *   totalWeeks = cycleWeeks + 18
+     *   currentWeek = totalWeeks - weeksToRace + 1
+     *
+     * 5주 단위 올림 덕분에 totalWeeks가 5주간 안정적으로 유지된다.
+     * 예) 대회 25주 전: cycleWeeks=10, totalWeeks=28, currentWeek=4
+     */
+    fun determinePlanType(targetDate: LocalDate, today: LocalDate): PlanSelection {
+        val weeksToRace = ChronoUnit.WEEKS.between(today, targetDate).toInt().coerceAtLeast(0)
+
+        return if (weeksToRace <= 18) {
+            PlanSelection(
+                totalWeeks = 18,
+                currentWeek = (18 - weeksToRace + 1).coerceIn(1, 18),
+            )
+        } else {
+            val excess = weeksToRace - 18
+            val cycleWeeks = ((excess + 4) / 5) * 5  // 5주 단위 올림
+            val totalWeeks = cycleWeeks + 18
+            PlanSelection(
+                totalWeeks = totalWeeks,
+                currentWeek = (totalWeeks - weeksToRace + 1).coerceIn(1, totalWeeks),
+            )
+        }
+    }
+
+    fun calculateVdotPaces(goalTimeSeconds: Int, goalEvent: String): VdotPaces {
+        val mp = goalTimeSeconds.toDouble() / raceDistanceKm(goalEvent)
+        return VdotPaces(
+            ePaceSec = (mp + 75).roundToInt(),   // Easy
+            mPaceSec = mp.roundToInt(),           // Marathon
+            tPaceSec = (mp - 12).roundToInt(),    // Threshold
+            iPaceSec = (mp - 27).roundToInt(),    // Interval
+            rPaceSec = (mp - 43).roundToInt(),    // Repetition
+        )
+    }
 
     fun raceDistanceKm(goalEvent: String): Double = when (goalEvent) {
         "10K" -> 10.0
@@ -55,84 +102,112 @@ class PaceCalculator {
         else -> 42.195
     }
 
-    fun defaultTotalWeeks(goalEvent: String): Int = when (goalEvent) {
-        "10K" -> 8
-        "HALF" -> 10
-        "MARATHON" -> 12
-        else -> 12
-    }
-
     fun determineLevel(racePaceSec: Int): Level = when {
         racePaceSec >= 540 -> Level.BEGINNER
         racePaceSec < 390 -> Level.ADVANCED
         else -> Level.INTERMEDIATE
     }
 
-    fun calculatePaces(goalTimeSeconds: Int, goalEvent: String): Paces {
-        val mp = goalTimeSeconds.toDouble() / raceDistanceKm(goalEvent)
-        return Paces(
-            racePaceSec = mp.roundToInt(),
-            jogPaceSec = (mp + 75).roundToInt(),
-            longRunPaceSec = (mp + 52).roundToInt(),
-            tempoPaceSec = (mp - 12).roundToInt(),
-            intervalPaceSec = (mp - 25).roundToInt(),
-            paceRunPaceSec = (mp + 15).roundToInt(),
-            arPaceSec = (mp + 62).roundToInt(),
+    fun generatePlan(goalTimeSeconds: Int, goalEvent: String, totalWeeks: Int): List<WeeklyPlan> {
+        val vdotPaces = calculateVdotPaces(goalTimeSeconds, goalEvent)
+        val level = determineLevel(vdotPaces.mPaceSec)
+
+        return (1..totalWeeks).map { week ->
+            generateWeeklyPlan(week, totalWeeks, goalEvent, vdotPaces, level)
+        }
+    }
+
+    private fun generateWeeklyPlan(
+        week: Int,
+        totalWeeks: Int,
+        goalEvent: String,
+        vdotPaces: VdotPaces,
+        level: Level,
+    ): WeeklyPlan {
+        val cycleWeeks = (totalWeeks - 18).coerceAtLeast(0)
+        val isCycleWeek = week <= cycleWeeks
+        val mainWeek = if (isCycleWeek) 0 else week - cycleWeeks  // 1..18 for main, 0 for cycle
+
+        val phase = determinePhase(week, totalWeeks)
+        val volumeMultiplier = phaseVolumeMultiplier(phase, if (isCycleWeek) 1 else mainWeek)
+
+        val levelRatio = when (level) {
+            Level.BEGINNER -> 0.7
+            Level.INTERMEDIATE -> 1.0
+            Level.ADVANCED -> 1.0
+        }
+        val longRunRatio = when (level) {
+            Level.BEGINNER -> 0.7
+            Level.INTERMEDIATE -> 1.0
+            Level.ADVANCED -> 1.1
+        }
+
+        // 사이클 주차: 초반 BASE 수준(week 3)의 거리, 메인 주차: 주차별 점진 증가
+        val distanceWeek = if (isCycleWeek) 3 else mainWeek
+
+        val spec = if (level == Level.BEGINNER) null
+                   else getIntervalSpec(distanceWeek, 18, level)
+
+        val baseEasyKm = easyRunKm(goalEvent, distanceWeek)
+
+        return WeeklyPlan(
+            weekNumber = week,
+            vdotPaces = vdotPaces,
+            level = level,
+            longRunKm = round1(longRunKm(goalEvent, distanceWeek, 18) * longRunRatio * volumeMultiplier),
+            easyRunKm = round1(baseEasyKm * levelRatio * volumeMultiplier),
+            tempoRunKm = round1(tempoRunKm(goalEvent, distanceWeek) * levelRatio * volumeMultiplier),
+            paceRunKm = round1(tempoRunKm(goalEvent, distanceWeek) * levelRatio * volumeMultiplier),
+            arRunKm = round1(baseEasyKm * 1.2 * levelRatio * volumeMultiplier),
+            intervalSpec = spec,
+            intervalTotalKm = if (spec != null) round1(spec.totalKm()) else 0.0,
+            phase = phase,
+            volumeMultiplier = round1(volumeMultiplier),
         )
     }
 
-    fun generatePlan(goalTimeSeconds: Int, goalEvent: String, totalWeeks: Int): List<WeeklyPlan> {
-        val paces = calculatePaces(goalTimeSeconds, goalEvent)
-        val level = determineLevel(paces.racePaceSec)
+    /**
+     * 통합 플랜 페이즈 결정:
+     * - totalWeeks > 18: 처음 (totalWeeks-18)주는 5주 순환 사이클, 나머지 18주는 메인 플랜
+     * - totalWeeks == 18: 순수 18주 메인 플랜
+     *
+     * 사이클: CYCLE_SPEED → CYCLE_THRESHOLD → CYCLE_VO2MAX → CYCLE_RACE_PACE → CYCLE_RECOVERY (5주 반복)
+     * 메인: BASE(1-6) → DEVELOP(7-12) → PEAK(13-16) → TAPER(17-18)
+     */
+    fun determinePhase(week: Int, totalWeeks: Int): String {
+        val cycleWeeks = (totalWeeks - 18).coerceAtLeast(0)
 
-        return (1..totalWeeks).map { week ->
-            val isTaper = week > totalWeeks - 2
-            val blockPosition = ((week - 1) % 4) + 1
-            val blockNumber = (week - 1) / 4
-
-            val positionMultiplier = when (blockPosition) {
-                1 -> 0.8   // 적응
-                2 -> 1.0   // 발전
-                3 -> 1.1   // 강화
-                4 -> 0.7   // 회복
-                else -> 1.0
+        if (week <= cycleWeeks) {
+            val cyclePos = ((week - 1) % 5) + 1
+            return when (cyclePos) {
+                1 -> "CYCLE_SPEED"
+                2 -> "CYCLE_THRESHOLD"
+                3 -> "CYCLE_VO2MAX"
+                4 -> "CYCLE_RACE_PACE"
+                5 -> "CYCLE_RECOVERY"
+                else -> "CYCLE_RECOVERY"
             }
-            val blockBaseMultiplier = 1.0 + blockNumber * 0.05
+        }
 
-            val volumeMultiplier = if (isTaper) 0.5
-                                   else positionMultiplier * blockBaseMultiplier
+        val mainWeek = week - cycleWeeks
+        return when {
+            mainWeek <= 6 -> "BASE"
+            mainWeek <= 12 -> "DEVELOP"
+            mainWeek <= 16 -> "PEAK"
+            else -> "TAPER"  // 17-18
+        }
+    }
 
-            val levelRatio = when (level) {
-                Level.BEGINNER -> 0.7
-                Level.INTERMEDIATE -> 1.0
-                Level.ADVANCED -> 1.0
-            }
-
-            val longRunRatio = when (level) {
-                Level.BEGINNER -> 0.7
-                Level.INTERMEDIATE -> 1.0
-                Level.ADVANCED -> 1.1
-            }
-
-            val spec = if (level == Level.BEGINNER) null
-                       else getIntervalSpec(week, totalWeeks, level)
-
-            val baseEasyKm = easyRunKm(goalEvent, week)
-
-            WeeklyPlan(
-                weekNumber = week,
-                paces = paces,
-                level = level,
-                longRunKm = round1(longRunKm(goalEvent, week, totalWeeks) * longRunRatio * volumeMultiplier),
-                easyRunKm = round1(baseEasyKm * levelRatio * volumeMultiplier),
-                tempoRunKm = round1(tempoRunKm(goalEvent, week) * levelRatio * volumeMultiplier),
-                paceRunKm = round1(tempoRunKm(goalEvent, week) * levelRatio * volumeMultiplier),
-                arRunKm = round1(baseEasyKm * 1.2 * levelRatio * volumeMultiplier),
-                intervalSpec = spec,
-                intervalTotalKm = if (spec != null) round1(spec.totalKm()) else 0.0,
-                blockPosition = blockPosition,
-                volumeMultiplier = round1(volumeMultiplier),
-            )
+    private fun phaseVolumeMultiplier(phase: String, mainWeek: Int): Double {
+        return when (phase) {
+            "BUILD", "BASE" -> 0.8 + (mainWeek - 1) * 0.05
+            "DEVELOP" -> 1.0
+            "PEAK" -> 1.1
+            "RECOVERY" -> 0.7
+            "TAPER" -> 0.5
+            "CYCLE_RECOVERY" -> 0.7
+            "CYCLE_SPEED", "CYCLE_THRESHOLD", "CYCLE_VO2MAX", "CYCLE_RACE_PACE" -> 0.9
+            else -> 1.0
         }
     }
 
