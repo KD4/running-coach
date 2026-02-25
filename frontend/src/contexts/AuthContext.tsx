@@ -25,7 +25,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export const GUEST_MODE_ENABLED = import.meta.env.VITE_GUEST_MODE === 'true';
+export const GUEST_MODE_ENABLED = false;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));

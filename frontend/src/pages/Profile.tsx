@@ -302,7 +302,7 @@ export default function Profile() {
 
         <Spacing size={spacing.section} />
         <button css={faqToggleStyle} onClick={() => setShowFaq((v) => !v)}>
-          <Paragraph typography="st7" color="secondary">자주 묻는 질문</Paragraph>
+          <span css={faqLabelStyle}>자주 묻는 질문</span>
           <span css={faqArrowStyle(showFaq)}>&#8250;</span>
         </button>
 
@@ -400,11 +400,18 @@ const faqToggleStyle = css`
   background: none;
   border: none;
   cursor: pointer;
+  color: #3182f6;
+`;
+
+const faqLabelStyle = css`
+  font-size: 15px;
+  font-weight: 600;
+  color: #3182f6;
 `;
 
 const faqArrowStyle = (open: boolean) => css`
   font-size: 1.1rem;
-  color: ${color.textTertiary};
+  color: #3182f6;
   transition: transform 0.2s;
   transform: rotate(${open ? '90deg' : '0deg'});
 `;

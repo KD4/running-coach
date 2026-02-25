@@ -71,14 +71,14 @@ const navStyle = css`
   bottom: 0;
   left: 0;
   right: 0;
-  height: ${layout.navHeight}px;
+  min-height: ${layout.navHeight}px;
   background: ${color.bgCard};
   border-top: 1.5px solid ${color.textTertiary};
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08), 0 -1px 4px rgba(0, 0, 0, 0.04);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding-top: 6px;
+  padding-top: 12px;
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
 `;
