@@ -27,3 +27,6 @@ oauth:
 toss:
   disconnect:
     basic-auth: ${TOSS_DISCONNECT_BASIC_AUTH:}
+  mtls:
+    cert: ${TOSS_MTLS_CERT:}
+    key: ${TOSS_MTLS_KEY:}
