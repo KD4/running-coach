@@ -31,3 +31,7 @@ application-local.yml
 backend/src/main/resources/running-coach-1_public.crt
 
 backend/src/main/resources/running-coach-1_private.key
+
+frontend/.env.production
+
+*.ait
