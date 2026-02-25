@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { appLogin } from '@apps-in-toss/web-bridge';
 import { oauthLogin } from '../api/auth';
-import { useAuth, GUEST_MODE_ENABLED } from '../contexts/AuthContext';
-import { Button, Paragraph, Spacing } from '@toss/tds-mobile';
+import { useAuth } from '../contexts/AuthContext';
+import { Asset, Top, StepperRow, Spacing, Paragraph, FixedBottomCTA } from '@toss/tds-mobile';
+import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
-import { spacing } from '../styles/tokens';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, loginAsGuest } = useAuth();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,72 +28,74 @@ export default function Login() {
     }
   };
 
-  const handleGuestStart = () => {
-    loginAsGuest();
-    navigate('/onboarding', { replace: true });
-  };
-
   return (
-    <div css={loginPageStyle}>
-      <div css={loginContainerStyle}>
-        <img src="/running_icon_small.png" alt="러닝 코치" css={logoImgStyle} />
-        <Spacing size={8} />
-        <Paragraph typography="t4">러닝 코치</Paragraph>
-        <Spacing size={8} />
-        <Paragraph typography="st6" color="secondary">
-          당신만의 맞춤 러닝 훈련 플랜
-        </Paragraph>
-        <Spacing size={32} />
-        {error && (
-          <>
-            <Paragraph typography="st6" color="danger">{error}</Paragraph>
-            <Spacing size={12} />
-          </>
-        )}
-        <Button
-          display="block"
-          size="xlarge"
-          onClick={handleTossLogin}
-          loading={loading}
-        >
-          토스로 시작하기
-        </Button>
-        {GUEST_MODE_ENABLED && (
-          <>
-            <Spacing size={spacing.md} />
-            <Button
-              display="block"
-              size="xlarge"
-              variant="weak"
-              onClick={handleGuestStart}
-            >
-              로그인 없이 시작하기
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+    <>
+      <Spacing size={12} />
+      <Top
+        title={
+          <Top.TitleParagraph size={22} color={adaptive.grey900}>
+            레이스 목표를 설정하고<br />
+            체계화된 훈련을<br />
+            매일 받아보세요
+          </Top.TitleParagraph>
+        }
+      />
+      <Spacing size={40} />
+      <StepperRow
+        left={
+          <StepperRow.AssetFrame
+            shape={Asset.frameShape.CleanW32}
+            content={<Asset.ContentIcon name="icon-credit-grade-up" aria-hidden />}
+          />
+        }
+        center={
+          <StepperRow.Texts
+            type="A"
+            title="목표를 설정하세요"
+            description="대회 종류, 목표 기록, 대회 날짜를 입력해요"
+          />
+        }
+      />
+      <StepperRow
+        left={
+          <StepperRow.AssetFrame
+            shape={Asset.frameShape.CleanW32}
+            content={<Asset.ContentIcon name="icon-credit-grade-up" aria-hidden />}
+          />
+        }
+        center={
+          <StepperRow.Texts
+            type="A"
+            title="맞춤 훈련 계획"
+            description="과학적 근거 기반의 체계적인 훈련 플랜을 받아요"
+          />
+        }
+      />
+      <StepperRow
+        left={
+          <StepperRow.AssetFrame
+            shape={Asset.frameShape.CleanW32}
+            content={<Asset.ContentIcon name="icon-credit-grade-up" aria-hidden />}
+          />
+        }
+        center={
+          <StepperRow.Texts
+            type="A"
+            title="매일 코칭 받기"
+            description="오늘의 훈련과 적정 페이스를 확인하세요"
+          />
+        }
+        hideLine={true}
+      />
+      {error && (
+        <div css={css`padding: 0 20px;`}>
+          <Spacing size={12} />
+          <Paragraph typography="st6" color="danger">{error}</Paragraph>
+        </div>
+      )}
+      <FixedBottomCTA loading={loading} onClick={handleTossLogin}>
+        토스로 시작하기
+      </FixedBottomCTA>
+    </>
   );
 }
-
-const loginPageStyle = css`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  padding: 20px;
-`;
-
-const loginContainerStyle = css`
-  text-align: center;
-  max-width: 320px;
-  width: 100%;
-`;
-
-const logoImgStyle = css`
-  width: 120px;
-  height: 120px;
-  margin-bottom: 8px;
-  border-radius: 24px;
-  object-fit: contain;
-`;

@@ -3,22 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { appLogin } from '@apps-in-toss/web-bridge';
 import { oauthLogin } from '../api/auth';
 import { submitOnboarding } from '../api/user';
-import { useAuth, GUEST_MODE_ENABLED } from '../contexts/AuthContext';
-import { Button, Paragraph, Spacing } from '@toss/tds-mobile';
+import { useAuth } from '../contexts/AuthContext';
+import { Asset, Top, StepperRow, Spacing, Paragraph, FixedBottomCTA } from '@toss/tds-mobile';
+import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
-import { spacing } from '../styles/tokens';
 import ProfileWizard from '../components/wizard/ProfileWizard';
 import type { WizardFormData } from '../components/wizard/types';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { token, isGuest, login, loginAsGuest, setOnboarded, setGuestProfile } = useAuth();
+  const { token, isGuest, login, setOnboarded, setGuestProfile } = useAuth();
   const isAuthenticated = !!token || isGuest;
   const [showIntro, setShowIntro] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  /* ─── 인트로: 로그인/게스트 선택 ─── */
+  /* ─── 인트로: 로그인 ─── */
 
   const handleTossLogin = async () => {
     setLoginLoading(true);
@@ -37,11 +37,6 @@ export default function Onboarding() {
     } finally {
       setLoginLoading(false);
     }
-  };
-
-  const handleGuestStart = () => {
-    loginAsGuest();
-    setShowIntro(false);
   };
 
   /* ─── 위자드: 프로필 설정 ─── */
@@ -77,57 +72,80 @@ export default function Onboarding() {
   /* ─── 인트로 화면 ─── */
   if (showIntro) {
     return (
-      <div css={introPageStyle}>
-        <div css={introContainerStyle}>
-          <img src="/running_icon_small.png" alt="러닝 코치" css={logoImgStyle} />
-          <Spacing size={8} />
-          <Paragraph typography="t4">러닝 코치</Paragraph>
-          <Spacing size={8} />
-          <Paragraph typography="st6" color="secondary">
-            당신만의 맞춤 러닝 훈련 플랜
-          </Paragraph>
-          <Spacing size={32} />
-          {isAuthenticated ? (
-            <Button
-              display="block"
-              size="xlarge"
-              onClick={() => setShowIntro(false)}
-            >
-              시작하기
-            </Button>
-          ) : (
-            <>
-              {loginError && (
-                <>
-                  <Paragraph typography="st6" color="danger">{loginError}</Paragraph>
-                  <Spacing size={12} />
-                </>
-              )}
-              <Button
-                display="block"
-                size="xlarge"
-                onClick={handleTossLogin}
-                loading={loginLoading}
-              >
-                토스로 시작하기
-              </Button>
-              {GUEST_MODE_ENABLED && (
-                <>
-                  <Spacing size={spacing.md} />
-                  <Button
-                    display="block"
-                    size="xlarge"
-                    variant="weak"
-                    onClick={handleGuestStart}
-                  >
-                    로그인 없이 시작하기
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      <>
+        <Spacing size={12} />
+        <Top
+          title={
+            <Top.TitleParagraph size={22} color={adaptive.grey900}>
+              레이스 목표를 설정하고<br />
+              체계화된 훈련을<br />
+              매일 받아보세요
+            </Top.TitleParagraph>
+          }
+        />
+        <Spacing size={40} />
+        <StepperRow
+          left={
+            <StepperRow.AssetFrame
+              shape={Asset.frameShape.CleanW32}
+              content={<Asset.ContentIcon name="icon-credit-grade-up" aria-hidden />}
+            />
+          }
+          center={
+            <StepperRow.Texts
+              type="A"
+              title="목표를 설정하세요"
+              description="대회 종류, 목표 기록, 대회 날짜를 입력해요"
+            />
+          }
+        />
+        <StepperRow
+          left={
+            <StepperRow.AssetFrame
+              shape={Asset.frameShape.CleanW32}
+              content={<Asset.ContentIcon name="icon-credit-grade-up" aria-hidden />}
+            />
+          }
+          center={
+            <StepperRow.Texts
+              type="A"
+              title="맞춤 훈련 계획"
+              description="과학적 근거 기반의 체계적인 훈련 플랜을 받아요"
+            />
+          }
+        />
+        <StepperRow
+          left={
+            <StepperRow.AssetFrame
+              shape={Asset.frameShape.CleanW32}
+              content={<Asset.ContentIcon name="icon-credit-grade-up" aria-hidden />}
+            />
+          }
+          center={
+            <StepperRow.Texts
+              type="A"
+              title="매일 코칭 받기"
+              description="오늘의 훈련과 적정 페이스를 확인하세요"
+            />
+          }
+          hideLine={true}
+        />
+        {loginError && (
+          <div css={css`padding: 0 20px;`}>
+            <Spacing size={12} />
+            <Paragraph typography="st6" color="danger">{loginError}</Paragraph>
+          </div>
+        )}
+        {isAuthenticated ? (
+          <FixedBottomCTA onClick={() => setShowIntro(false)}>
+            시작하기
+          </FixedBottomCTA>
+        ) : (
+          <FixedBottomCTA loading={loginLoading} onClick={handleTossLogin}>
+            토스로 시작하기
+          </FixedBottomCTA>
+        )}
+      </>
     );
   }
 
@@ -136,25 +154,3 @@ export default function Onboarding() {
     <ProfileWizard mode="create" onComplete={handleComplete} onCancel={handleCancel} />
   );
 }
-
-const introPageStyle = css`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  padding: 20px;
-`;
-
-const introContainerStyle = css`
-  text-align: center;
-  max-width: 320px;
-  width: 100%;
-`;
-
-const logoImgStyle = css`
-  width: 120px;
-  height: 120px;
-  margin-bottom: 8px;
-  border-radius: 24px;
-  object-fit: contain;
-`;
