@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { appLogin } from '@apps-in-toss/web-bridge';
 import { oauthLogin } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
-import { Asset, Top, StepperRow, Spacing, Paragraph, FixedBottomCTA } from '@toss/tds-mobile';
+import { Asset, Top, StepperRow, Spacing, Paragraph, Button } from '@toss/tds-mobile';
 import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
 
@@ -93,9 +93,21 @@ export default function Login() {
           <Paragraph typography="st6" color="danger">{error}</Paragraph>
         </div>
       )}
-      <FixedBottomCTA loading={loading} onClick={handleTossLogin}>
-        토스로 시작하기
-      </FixedBottomCTA>
+      <div css={fixedBottomStyle}>
+        <Button display="block" size="xlarge" loading={loading} onClick={handleTossLogin}>
+          토스로 시작하기
+        </Button>
+      </div>
     </>
   );
 }
+
+const fixedBottomStyle = css`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 20px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  background: white;
+`;

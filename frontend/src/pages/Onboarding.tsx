@@ -4,7 +4,7 @@ import { appLogin } from '@apps-in-toss/web-bridge';
 import { oauthLogin } from '../api/auth';
 import { submitOnboarding } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
-import { Asset, Top, StepperRow, Spacing, Paragraph, FixedBottomCTA } from '@toss/tds-mobile';
+import { Asset, Top, StepperRow, Spacing, Paragraph, Button } from '@toss/tds-mobile';
 import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
 import ProfileWizard from '../components/wizard/ProfileWizard';
@@ -136,15 +136,17 @@ export default function Onboarding() {
             <Paragraph typography="st6" color="danger">{loginError}</Paragraph>
           </div>
         )}
-        {isAuthenticated ? (
-          <FixedBottomCTA onClick={() => setShowIntro(false)}>
-            시작하기
-          </FixedBottomCTA>
-        ) : (
-          <FixedBottomCTA loading={loginLoading} onClick={handleTossLogin}>
-            토스로 시작하기
-          </FixedBottomCTA>
-        )}
+        <div css={fixedBottomStyle}>
+          {isAuthenticated ? (
+            <Button display="block" size="xlarge" onClick={() => setShowIntro(false)}>
+              시작하기
+            </Button>
+          ) : (
+            <Button display="block" size="xlarge" loading={loginLoading} onClick={handleTossLogin}>
+              토스로 시작하기
+            </Button>
+          )}
+        </div>
       </>
     );
   }
@@ -154,3 +156,13 @@ export default function Onboarding() {
     <ProfileWizard mode="create" onComplete={handleComplete} onCancel={handleCancel} />
   );
 }
+
+const fixedBottomStyle = css`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 20px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  background: white;
+`;
