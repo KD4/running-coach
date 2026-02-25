@@ -78,7 +78,7 @@ const navStyle = css`
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 6px;
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
 `;

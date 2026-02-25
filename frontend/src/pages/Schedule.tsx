@@ -111,9 +111,7 @@ export default function Schedule() {
                     onClick={() => setSelected(cell)}
                   >
                     <span css={calDayStyle(isToday)}>{day}</span>
-                    {type && type !== 'REST' && (
-                      <span css={calDotStyle(dotColor!)} />
-                    )}
+                    <span css={calDotStyle(type && type !== 'REST' ? dotColor! : 'transparent')} />
                   </div>
                 );
               })}
@@ -257,17 +255,17 @@ const calCellStyle = (isSelected: boolean) => css`
 `;
 
 const calDayStyle = (isToday: boolean) => css`
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
   font-size: 1rem;
   font-weight: 500;
   ${isToday ? `
     background: ${color.primary};
     color: white;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   ` : ''}
 `;
 
