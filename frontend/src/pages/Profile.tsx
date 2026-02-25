@@ -48,6 +48,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showFaq, setShowFaq] = useState(false);
 
   useEffect(() => {
     if (isGuest && guestProfile) {
@@ -298,6 +299,34 @@ export default function Profile() {
             </TextButton>
           )}
         </div>
+
+        <Spacing size={spacing.section} />
+        <button css={faqToggleStyle} onClick={() => setShowFaq((v) => !v)}>
+          <Paragraph typography="st7" color="secondary">자주 묻는 질문</Paragraph>
+          <span css={faqArrowStyle(showFaq)}>&#8250;</span>
+        </button>
+
+        {showFaq && (
+          <>
+            <Spacing size={spacing.sm} />
+            <QaItem
+              q="훈련 스케줄은 어떤 근거로 만들어지나요?"
+              a="목표 완주 시간에서 km당 목표 페이스를 계산하고, 스포츠 과학에서 검증된 훈련 강도 비율을 적용해요. Easy, Tempo, Interval 등 훈련 구간별 적정 페이스가 자동으로 산출돼요."
+            />
+            <QaItem
+              q="18주 동안 훈련 강도가 어떻게 바뀌나요?"
+              a="기초 → 발전 → 강화 → 테이퍼링 순서로 진행돼요. 매 4주마다 훈련 볼륨을 조정하고, 피크 주차 이후 테이퍼링 기간에는 강도를 유지하면서 볼륨을 줄여 대회 당일 최상의 컨디션을 만들어요."
+            />
+            <QaItem
+              q="18주가 안 남았는데 괜찮나요?"
+              a="남은 기간에 맞춰 훈련 단계를 자동으로 조정해드려요. 다만 부상 방지와 충분한 테이퍼링을 위해 12주 이상 여유를 두는 걸 권장해요."
+            />
+            <QaItem
+              q="테이퍼링이 뭔가요?"
+              a="대회 2~3주 전 훈련량을 줄여 몸을 회복시키는 과정이에요. 훈련 강도는 유지하면서 볼륨만 줄여서, 누적된 피로를 풀고 대회 당일 최고의 퍼포먼스를 낼 수 있도록 도와줘요."
+            />
+          </>
+        )}
       </div>
 
       {/* 편집 모드 - 위자드 오버레이 */}
@@ -314,6 +343,71 @@ export default function Profile() {
     </>
   );
 }
+
+function QaItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div css={qaItemStyle} onClick={() => setOpen(!open)}>
+      <div css={qaQuestionRow}>
+        <Paragraph typography="st7" css={css`flex: 1;`}>Q. {q}</Paragraph>
+        <span css={qaArrowStyle(open)}>&#8250;</span>
+      </div>
+      {open && (
+        <div css={qaAnswerStyle}>
+          <Paragraph typography="st8" color="secondary" css={css`line-height: 1.6;`}>{a}</Paragraph>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const qaItemStyle = css`
+  background: ${color.bgCard};
+  border: 1.5px solid ${color.border};
+  border-radius: 12px;
+  padding: ${spacing.lg}px;
+  margin-bottom: ${spacing.sm}px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+`;
+
+const qaQuestionRow = css`
+  display: flex;
+  align-items: center;
+  gap: ${spacing.sm}px;
+`;
+
+const qaArrowStyle = (open: boolean) => css`
+  font-size: 1.2rem;
+  color: ${color.textSecondary};
+  transition: transform 0.2s;
+  transform: rotate(${open ? '90deg' : '0deg'});
+`;
+
+const qaAnswerStyle = css`
+  margin-top: ${spacing.md}px;
+  padding-top: ${spacing.md}px;
+  border-top: 1px solid ${color.border};
+`;
+
+const faqToggleStyle = css`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: ${spacing.md}px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+`;
+
+const faqArrowStyle = (open: boolean) => css`
+  font-size: 1.1rem;
+  color: ${color.textTertiary};
+  transition: transform 0.2s;
+  transform: rotate(${open ? '90deg' : '0deg'});
+`;
 
 const logoutRowStyle = css`
   display: flex;

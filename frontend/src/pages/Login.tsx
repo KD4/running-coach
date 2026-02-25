@@ -36,7 +36,7 @@ export default function Login() {
   return (
     <div css={loginPageStyle}>
       <div css={loginContainerStyle}>
-        <div css={logoStyle}>🏃</div>
+        <img src="/running_icon_small.png" alt="러닝 코치" css={logoImgStyle} />
         <Spacing size={8} />
         <Paragraph typography="t4">러닝 코치</Paragraph>
         <Spacing size={8} />
@@ -90,7 +90,10 @@ const loginContainerStyle = css`
   width: 100%;
 `;
 
-const logoStyle = css`
-  font-size: 4rem;
+const logoImgStyle = css`
+  width: 120px;
+  height: 120px;
   margin-bottom: 8px;
+  border-radius: 24px;
+  object-fit: contain;
 `;

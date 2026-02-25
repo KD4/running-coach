@@ -1,12 +1,20 @@
 package com.kd4.runningcoach.service
 
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.kd4.runningcoach.dto.*
 import com.kd4.runningcoach.repository.UserProfileRepository
 import org.springframework.stereotype.Service
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
+
+data class UserCacheEntry(
+    val today: ConcurrentHashMap<LocalDate, TodayResponse> = ConcurrentHashMap(),
+    val monthly: ConcurrentHashMap<String, MonthlyScheduleResponse> = ConcurrentHashMap(),
+)
 
 @Service
 class ScheduleService(
@@ -14,13 +22,29 @@ class ScheduleService(
     private val paceCalculator: PaceCalculator,
 ) {
 
+    private val userCache = Caffeine.newBuilder()
+        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .maximumSize(500)
+        .build<Long, UserCacheEntry>()
+
     // --- 로그인 유저용 ---
     fun getToday(userId: Long, date: LocalDate = LocalDate.now()): TodayResponse {
-        return calculateToday(getProfileData(userId), date)
+        val entry = userCache.get(userId) { UserCacheEntry() }!!
+        return entry.today.getOrPut(date) {
+            calculateToday(getProfileData(userId), date)
+        }
     }
 
     fun getMonthlySchedule(userId: Long, year: Int, month: Int): MonthlyScheduleResponse {
-        return calculateMonthly(getProfileData(userId), year, month)
+        val entry = userCache.get(userId) { UserCacheEntry() }!!
+        val key = "$year-$month"
+        return entry.monthly.getOrPut(key) {
+            calculateMonthly(getProfileData(userId), year, month)
+        }
+    }
+
+    fun evictUser(userId: Long) {
+        userCache.invalidate(userId)
     }
 
     // --- 게스트용 ---

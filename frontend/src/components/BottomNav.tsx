@@ -73,11 +73,12 @@ const navStyle = css`
   right: 0;
   height: ${layout.navHeight}px;
   background: ${color.bgCard};
-  border-top: 1px solid ${color.border};
+  border-top: 1.5px solid ${color.textTertiary};
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08), 0 -1px 4px rgba(0, 0, 0, 0.04);
   display: flex;
   justify-content: space-around;
   align-items: center;
-
+  padding-top: 6px;
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
 `;
@@ -85,6 +86,9 @@ const navStyle = css`
 const navItemStyle = css`
   text-decoration: none;
   padding: 4px 16px;
+  &:active, &:hover, &:focus, &.active {
+    text-decoration: none;
+  }
 `;
 
 const navItemInnerStyle = (isActive: boolean) => css`

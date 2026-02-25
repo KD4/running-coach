@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 class UserService(
     private val userRepository: UserRepository,
     private val userProfileRepository: UserProfileRepository,
+    private val scheduleService: ScheduleService,
 ) {
 
     private val log = LoggerFactory.getLogger(UserService::class.java)
@@ -57,6 +58,7 @@ class UserService(
         profile.targetWeight = request.targetWeight
 
         userProfileRepository.save(profile)
+        scheduleService.evictUser(userId)
         return profile.toResponse()
     }
 

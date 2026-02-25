@@ -212,6 +212,8 @@ const calendarStyle = css`
   border-radius: ${radius.card}px;
   padding: ${spacing.lg}px;
   margin-bottom: ${spacing.md}px;
+  border: 1.5px solid ${color.border};
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
 `;
 
 const calendarHeaderStyle = css`
@@ -301,6 +303,8 @@ const dayDetailStyle = css`
   background: ${color.bgCard};
   border-radius: ${radius.card}px;
   padding: ${spacing.lg}px ${spacing.xl}px;
+  border: 1.5px solid ${color.border};
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
 `;
 
 const workoutTypeLabelStyle = (bgColor: string) => css`

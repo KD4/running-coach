@@ -54,7 +54,7 @@ export default function Today() {
 
   return (
     <div css={pageStyle}>
-      {/* 헤더: Week 뱃지 + 날짜, 좌측 정렬 */}
+      {/* 헤더: Week 뱃지 + 날짜 */}
       <Spacing size={spacing.sm} />
       <Badge size="small" variant="weak" color="blue" css={weekBadgeStyle}>Week {data.weekNumber}/{data.totalWeeks}</Badge>
       <Spacing size={spacing.xs} />
