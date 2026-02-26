@@ -44,3 +44,24 @@ export async function updateProfile(data: ProfileUpdateRequest): Promise<Profile
   const { data: res } = await client.put<ProfileResponse>('/api/users/profile', data);
   return res;
 }
+
+export interface NotificationSettingResponse {
+  enabled: boolean;
+  hour: number;
+}
+
+export async function getNotificationSetting(): Promise<NotificationSettingResponse> {
+  const { data } = await client.get<NotificationSettingResponse>('/api/users/notification');
+  return data;
+}
+
+export async function updateNotificationSetting(
+  enabled: boolean,
+  hour: number,
+): Promise<NotificationSettingResponse> {
+  const { data } = await client.put<NotificationSettingResponse>('/api/users/notification', {
+    enabled,
+    hour,
+  });
+  return data;
+}

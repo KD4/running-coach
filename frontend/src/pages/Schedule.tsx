@@ -17,13 +17,21 @@ export default function Schedule() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [data, setData] = useState<MonthlyScheduleResponse | null>(null);
+  const { getCachedMonthly, fetchMonthly } = useDataCache();
+  const initialCached = getCachedMonthly(now.getFullYear(), now.getMonth() + 1);
+  const [data, setData] = useState<MonthlyScheduleResponse | null>(initialCached);
   const [selected, setSelected] = useState<ScheduleDayDto | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialCached);
   const [error, setError] = useState<string | null>(null);
-  const { fetchMonthly } = useDataCache();
 
   useEffect(() => {
+    const cached = getCachedMonthly(year, month);
+    if (cached) {
+      setData(cached);
+      setSelected(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     fetchMonthly(year, month)

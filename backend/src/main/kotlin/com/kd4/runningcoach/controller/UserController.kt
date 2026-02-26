@@ -1,5 +1,7 @@
 package com.kd4.runningcoach.controller
 
+import com.kd4.runningcoach.dto.NotificationSettingRequest
+import com.kd4.runningcoach.dto.NotificationSettingResponse
 import com.kd4.runningcoach.dto.OnboardingRequest
 import com.kd4.runningcoach.dto.ProfileResponse
 import com.kd4.runningcoach.dto.ProfileUpdateRequest
@@ -36,6 +38,21 @@ class UserController(
     ): ResponseEntity<ProfileResponse> {
         val userId = request.getAttribute("userId") as Long
         return ResponseEntity.ok(userService.updateProfile(userId, body))
+    }
+
+    @GetMapping("/notification")
+    fun getNotificationSetting(request: HttpServletRequest): ResponseEntity<NotificationSettingResponse> {
+        val userId = request.getAttribute("userId") as Long
+        return ResponseEntity.ok(userService.getNotificationSetting(userId))
+    }
+
+    @PutMapping("/notification")
+    fun updateNotificationSetting(
+        request: HttpServletRequest,
+        @RequestBody body: NotificationSettingRequest,
+    ): ResponseEntity<NotificationSettingResponse> {
+        val userId = request.getAttribute("userId") as Long
+        return ResponseEntity.ok(userService.updateNotificationSetting(userId, body))
     }
 
     @DeleteMapping("/account")

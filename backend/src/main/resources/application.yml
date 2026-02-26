@@ -16,6 +16,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          time_zone: UTC
     open-in-view: false
 
 server:
@@ -36,3 +38,5 @@ toss:
   mtls:
     cert: ${TOSS_MTLS_CERT:}
     key: ${TOSS_MTLS_KEY:}
+  message:
+    template-code: ${TOSS_MESSAGE_TEMPLATE_CODE:daily_schedule_reminder}

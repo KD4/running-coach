@@ -9,15 +9,17 @@ import { useTossBanner } from '../hooks/useTossBanner';
 import { useDataCache } from '../contexts/DataCacheContext';
 
 export default function Today() {
-  const [data, setData] = useState<TodayResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { getCachedToday, fetchToday } = useDataCache();
+  const cached = getCachedToday();
+  const [data, setData] = useState<TodayResponse | null>(cached);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
   const [showDiet, setShowDiet] = useState(false);
   const [showDietTip, setShowDietTip] = useState(false);
   const bannerRef = useTossBanner('ait-ad-test-banner-id');
-  const { fetchToday } = useDataCache();
 
   useEffect(() => {
+    if (cached) return;
     fetchToday()
       .then(setData)
       .catch((err) => {

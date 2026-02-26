@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, updateProfile } from '../api/user';
-import type { ProfileResponse } from '../api/user';
+import { getProfile, updateProfile, getNotificationSetting, updateNotificationSetting } from '../api/user';
+import type { ProfileResponse, NotificationSettingResponse } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
 import type { GuestProfile } from '../contexts/AuthContext';
 import { useDataCache } from '../contexts/DataCacheContext';
@@ -49,6 +49,8 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifHour, setNotifHour] = useState(7);
 
   useEffect(() => {
     if (isGuest && guestProfile) {
@@ -69,6 +71,14 @@ export default function Profile() {
         }
       })
       .finally(() => setLoading(false));
+
+    // 알림 설정 조회 (로그인 유저만)
+    getNotificationSetting()
+      .then((s) => {
+        setNotifEnabled(s.enabled);
+        setNotifHour(s.hour);
+      })
+      .catch(() => {});
   }, []);
 
   const handleWizardComplete = async (data: WizardFormData) => {
@@ -103,6 +113,27 @@ export default function Profile() {
 
   const handleCancel = () => {
     setEditing(false);
+  };
+
+  const handleNotifToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newEnabled = !notifEnabled;
+    setNotifEnabled(newEnabled);
+    try {
+      await updateNotificationSetting(newEnabled, notifHour);
+    } catch {
+      setNotifEnabled(!newEnabled);
+    }
+  };
+
+  const handleNotifHourChange = async (newHour: number) => {
+    const prevHour = notifHour;
+    setNotifHour(newHour);
+    try {
+      await updateNotificationSetting(notifEnabled, newHour);
+    } catch {
+      setNotifHour(prevHour);
+    }
   };
 
   const handleLogout = () => {
@@ -196,6 +227,48 @@ export default function Profile() {
             />
           )}
         </List>
+
+        {/* 알림 설정 (토스 로그인 유저만) */}
+        {!isGuest && (
+          <>
+            <Border variant="height16" />
+            <div css={notifSectionStyle}>
+              <span css={notifTitleStyle}>알림 설정</span>
+              <List>
+                <ListRow
+                  contents={<ListRow.Texts type="1RowTypeA" top="데일리 알림" topProps={{ color: adaptive.grey800 }} />}
+                  right={
+                    <button css={toggleBtnStyle(notifEnabled)} onClick={handleNotifToggle}>
+                      <span css={toggleKnobStyle(notifEnabled)} />
+                    </button>
+                  }
+                  verticalPadding="large"
+                />
+                {notifEnabled && (
+                  <ListRow
+                    contents={<ListRow.Texts type="1RowTypeA" top="알림 시간" topProps={{ color: adaptive.grey800 }} />}
+                    right={
+                      <div css={timeSelectWrapStyle}>
+                        <select
+                          css={timeSelectStyle}
+                          value={notifHour}
+                          onChange={(e) => handleNotifHourChange(Number(e.target.value))}
+                        >
+                          {Array.from({ length: 17 }, (_, i) => i + 6).map((h) => (
+                            <option key={h} value={h}>
+                              {h < 12 ? `오전 ${h}시` : h === 12 ? '오후 12시' : `오후 ${h - 12}시`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    }
+                    verticalPadding="large"
+                  />
+                )}
+              </List>
+            </div>
+          </>
+        )}
 
         <Border variant="height16" />
 
@@ -319,6 +392,63 @@ const loadingStyle = css`
 const answerStyle = css`
   padding: 0 20px 16px;
   background: ${adaptive.grey100};
+`;
+
+const notifSectionStyle = css`
+  padding-top: 16px;
+`;
+
+const notifTitleStyle = css`
+  display: block;
+  padding: 0 20px 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: ${adaptive.grey600};
+`;
+
+const toggleBtnStyle = (on: boolean) => css`
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  background: ${on ? '#3182f6' : adaptive.grey300};
+  transition: background 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+`;
+
+const toggleKnobStyle = (on: boolean) => css`
+  position: absolute;
+  top: 3px;
+  left: ${on ? '23px' : '3px'};
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  transition: left 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+`;
+
+const timeSelectWrapStyle = css`
+  display: flex;
+  align-items: center;
+`;
+
+const timeSelectStyle = css`
+  appearance: none;
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: ${adaptive.grey700};
+  cursor: pointer;
+  padding: 4px 20px 4px 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  text-align: right;
 `;
 
 const wizardOverlayStyle = css`

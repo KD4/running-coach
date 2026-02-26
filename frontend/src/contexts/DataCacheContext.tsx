@@ -6,6 +6,9 @@ import { getTodaySchedule, getMonthlySchedule } from '../api/schedule';
 import { getProfile } from '../api/user';
 
 interface DataCache {
+  getCachedToday: () => TodayResponse | null;
+  getCachedMonthly: (year: number, month: number) => MonthlyScheduleResponse | null;
+  getCachedProfile: () => ProfileResponse | null;
   fetchToday: (force?: boolean) => Promise<TodayResponse>;
   fetchMonthly: (year: number, month: number, force?: boolean) => Promise<MonthlyScheduleResponse>;
   fetchProfile: (force?: boolean) => Promise<ProfileResponse>;
@@ -23,6 +26,22 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   const TTL = 5 * 60 * 1000;
 
   const isValid = (ts: number) => Date.now() - ts < TTL;
+
+  const getCachedToday = useCallback((): TodayResponse | null => {
+    if (todayRef.current && isValid(todayRef.current.ts)) return todayRef.current.data;
+    return null;
+  }, []);
+
+  const getCachedMonthly = useCallback((year: number, month: number): MonthlyScheduleResponse | null => {
+    const cached = monthlyRef.current.get(`${year}-${month}`);
+    if (cached && isValid(cached.ts)) return cached.data;
+    return null;
+  }, []);
+
+  const getCachedProfile = useCallback((): ProfileResponse | null => {
+    if (profileRef.current && isValid(profileRef.current.ts)) return profileRef.current.data;
+    return null;
+  }, []);
 
   const fetchToday = useCallback(async (force = false): Promise<TodayResponse> => {
     if (!force && todayRef.current && isValid(todayRef.current.ts)) {
@@ -60,7 +79,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <DataCacheContext.Provider value={{ fetchToday, fetchMonthly, fetchProfile, invalidateAll }}>
+    <DataCacheContext.Provider value={{ getCachedToday, getCachedMonthly, getCachedProfile, fetchToday, fetchMonthly, fetchProfile, invalidateAll }}>
       {children}
     </DataCacheContext.Provider>
   );

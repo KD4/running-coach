@@ -1,6 +1,8 @@
 package com.kd4.runningcoach.service
 
 import com.kd4.runningcoach.config.AuthInterceptor
+import com.kd4.runningcoach.dto.NotificationSettingRequest
+import com.kd4.runningcoach.dto.NotificationSettingResponse
 import com.kd4.runningcoach.dto.OnboardingRequest
 import com.kd4.runningcoach.dto.ProfileResponse
 import com.kd4.runningcoach.dto.ProfileUpdateRequest
@@ -62,6 +64,26 @@ class UserService(
         userProfileRepository.save(profile)
         scheduleService.evictUser(userId)
         return profile.toResponse()
+    }
+
+    fun getNotificationSetting(userId: Long): NotificationSettingResponse {
+        val profile = userProfileRepository.findByUserId(userId) ?: throw RuntimeException("Profile not found")
+        return NotificationSettingResponse(
+            enabled = profile.notificationEnabled,
+            hour = profile.notificationHour,
+        )
+    }
+
+    @Transactional
+    fun updateNotificationSetting(userId: Long, request: NotificationSettingRequest): NotificationSettingResponse {
+        val profile = userProfileRepository.findByUserId(userId) ?: throw RuntimeException("Profile not found")
+        profile.notificationEnabled = request.enabled
+        profile.notificationHour = request.hour
+        userProfileRepository.save(profile)
+        return NotificationSettingResponse(
+            enabled = profile.notificationEnabled,
+            hour = profile.notificationHour,
+        )
     }
 
     @Transactional
