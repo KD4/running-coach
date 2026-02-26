@@ -4,6 +4,7 @@ import { getProfile, updateProfile } from '../api/user';
 import type { ProfileResponse } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
 import type { GuestProfile } from '../contexts/AuthContext';
+import { useDataCache } from '../contexts/DataCacheContext';
 import { List, ListRow, Paragraph, Spacing, Loader, Top, Border } from '@toss/tds-mobile';
 import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
@@ -42,6 +43,7 @@ function profileToWizardData(p: ProfileResponse): WizardFormData {
 export default function Profile() {
   const navigate = useNavigate();
   const { logout, isGuest, guestProfile, setGuestProfile } = useAuth();
+  const { invalidateAll } = useDataCache();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,7 @@ export default function Profile() {
     if (isGuest) {
       setGuestProfile(profileData);
       setProfile(guestToProfileResponse(profileData));
+      invalidateAll();
       setEditing(false);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
@@ -92,6 +95,7 @@ export default function Profile() {
 
     const updated = await updateProfile(profileData);
     setProfile(updated);
+    invalidateAll();
     setEditing(false);
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2000);

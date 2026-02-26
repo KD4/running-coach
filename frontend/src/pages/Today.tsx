@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getTodaySchedule } from '../api/schedule';
 import type { TodayResponse } from '../types';
 import { Paragraph, Spacing, Badge, Loader } from '@toss/tds-mobile';
 import { css } from '@emotion/react';
 import { WORKOUT_LABELS, WORKOUT_COLORS } from '../constants/workout';
 import { color, spacing, radius } from '../styles/tokens';
 import { pageStyle, centerStyle } from '../styles/common';
+import { useTossBanner } from '../hooks/useTossBanner';
+import { useDataCache } from '../contexts/DataCacheContext';
 
 export default function Today() {
   const [data, setData] = useState<TodayResponse | null>(null);
@@ -13,9 +14,11 @@ export default function Today() {
   const [error, setError] = useState<string | null>(null);
   const [showDiet, setShowDiet] = useState(false);
   const [showDietTip, setShowDietTip] = useState(false);
+  const bannerRef = useTossBanner('ait-ad-test-banner-id');
+  const { fetchToday } = useDataCache();
 
   useEffect(() => {
-    getTodaySchedule()
+    fetchToday()
       .then(setData)
       .catch((err) => {
         if (err?.response?.status === 404) {
@@ -58,7 +61,7 @@ export default function Today() {
       <Spacing size={spacing.sm} />
       <Badge size="small" variant="weak" color="blue" css={weekBadgeStyle}>Week {data.weekNumber}/{data.totalWeeks}</Badge>
       <Spacing size={spacing.xs} />
-      <Paragraph typography="t5" css={dateTitleStyle}>
+      <Paragraph typography="st5" css={dateTitleStyle}>
         {new Date(data.date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
       </Paragraph>
       <Spacing size={spacing.lg} />
@@ -67,9 +70,9 @@ export default function Today() {
       <div css={workoutCardStyle(workoutColor)}>
         {data.isRestDay ? (
           <div css={restDayStyle}>
-            <Paragraph typography="st6" color="secondary">휴식</Paragraph>
+            <Paragraph typography="st7" color="secondary">휴식</Paragraph>
             <Spacing size={spacing.sm} />
-            <Paragraph typography="st7" color="secondary">
+            <Paragraph typography="st8" color="secondary">
               오늘은 쉬는 날입니다. 충분한 회복을 취하세요!
             </Paragraph>
           </div>
@@ -81,7 +84,7 @@ export default function Today() {
               </Paragraph>
             </div>
             <Spacing size={spacing.md} />
-            <Paragraph typography="t4" css={workoutDetailsStyle}>
+            <Paragraph typography="t5" css={workoutDetailsStyle}>
               {`${workout.distanceKm}km`}
               {workout.paceTarget && ` | ${workout.paceTarget}/km`}
             </Paragraph>
@@ -94,9 +97,9 @@ export default function Today() {
           </>
         ) : (
           <div css={restDayStyle}>
-            <Paragraph typography="st6" color="secondary">휴식</Paragraph>
+            <Paragraph typography="st7" color="secondary">휴식</Paragraph>
             <Spacing size={spacing.sm} />
-            <Paragraph typography="st7" color="secondary">오늘은 훈련이 없습니다.</Paragraph>
+            <Paragraph typography="st8" color="secondary">오늘은 훈련이 없습니다.</Paragraph>
           </div>
         )}
       </div>
@@ -104,9 +107,9 @@ export default function Today() {
 
       {/* 칼로리 카드 */}
       <div css={caloriesCardStyle}>
-        <Paragraph typography="st7" color="secondary">오늘의 칼로리</Paragraph>
+        <Paragraph typography="st8" color="secondary">오늘의 칼로리</Paragraph>
         <Spacing size={spacing.xs} />
-        <Paragraph typography="t4" css={css`color: ${color.primary}; font-weight: 1000;`}>
+        <Paragraph typography="t5" css={css`color: ${color.primary}; font-weight: 1000;`}>
           {data.calories.totalRecommended.toLocaleString()} kcal
         </Paragraph>
         <Spacing size={spacing.md} />
@@ -190,17 +193,21 @@ export default function Today() {
           </>
         )}
       </div>
+      <Spacing size={spacing.md} />
+      <div ref={bannerRef} css={bannerContainerStyle} />
     </div>
   );
 }
 
-const weekBadgeStyle = css`
-  font-size: 105%;
+const bannerContainerStyle = css`
+  width: 100%;
+  min-height: 96px;
+  margin-bottom: ${spacing.lg}px;
 `;
 
-const dateTitleStyle = css`
-  font-size: 105%;
-`;
+const weekBadgeStyle = css``;
+
+const dateTitleStyle = css``;
 
 const workoutCardStyle = (borderColor: string) => css`
   background: ${color.bgPage};
@@ -301,6 +308,6 @@ const dietTipBubbleStyle = css`
 
 const dietTipTextStyle = css`
   color: #FFFFFF;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   line-height: 1.5;
 `;

@@ -23,7 +23,7 @@ class ScheduleService(
 ) {
 
     private val userCache = Caffeine.newBuilder()
-        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .expireAfterAccess(2, TimeUnit.HOURS)
         .maximumSize(500)
         .build<Long, UserCacheEntry>()
 

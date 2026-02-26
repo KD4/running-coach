@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getMonthlySchedule } from '../api/schedule';
 import type { MonthlyScheduleResponse, ScheduleDayDto } from '../types';
 import { Paragraph, Spacing, Badge, Loader } from '@toss/tds-mobile';
 import { css } from '@emotion/react';
 import { WORKOUT_COLORS, WORKOUT_SHORT, WORKOUT_LABELS } from '../constants/workout';
 import { color, spacing, radius } from '../styles/tokens';
 import { pageStyle } from '../styles/common';
+import { showInterstitialAd } from '../hooks/useInterstitialAd';
+import { useDataCache } from '../contexts/DataCacheContext';
 
 const DAY_HEADERS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -20,11 +21,12 @@ export default function Schedule() {
   const [selected, setSelected] = useState<ScheduleDayDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { fetchMonthly } = useDataCache();
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getMonthlySchedule(year, month)
+    fetchMonthly(year, month)
       .then((d) => {
         setData(d);
         setSelected(null);
@@ -66,10 +68,34 @@ export default function Schedule() {
     return cells;
   };
 
+  const [pendingCell, setPendingCell] = useState<ScheduleDayDto | null>(null);
+
+  const handleDayClick = (cell: ScheduleDayDto) => {
+    // TTL 내면 광고 스킵 → 바로 상세
+    if (!showInterstitialAd.shouldShow()) {
+      setSelected(cell);
+      return;
+    }
+    // 광고 대상이면 확인 팝업
+    setPendingCell(cell);
+  };
+
+  const handleAdConfirm = async () => {
+    const cell = pendingCell;
+    setPendingCell(null);
+    if (!cell) return;
+    await showInterstitialAd('ait-ad-test-interstitial-id');
+    setSelected(cell);
+  };
+
+  const handleAdCancel = () => {
+    setPendingCell(null);
+  };
+
   const cells = buildGrid();
 
   return (
-    <div css={pageStyle}>
+    <div css={[pageStyle, schedulePageStyle]}>
       {/* 월 네비게이션 */}
       <div css={monthNavStyle}>
         <button css={navBtnStyle} onClick={prevMonth} aria-label="이전 달">&#8249;</button>
@@ -108,7 +134,7 @@ export default function Schedule() {
                   <div
                     key={i}
                     css={calCellStyle(isSelected)}
-                    onClick={() => setSelected(cell)}
+                    onClick={() => handleDayClick(cell)}
                   >
                     <span css={calDayStyle(isToday)}>{day}</span>
                     <span css={calDotStyle(type && type !== 'REST' ? dotColor! : 'transparent')} />
@@ -125,7 +151,7 @@ export default function Schedule() {
               .map(([key, c]) => (
                 <div key={key} css={legendItemStyle}>
                   <span css={legendDotStyle(c)} />
-                  <Paragraph typography="st7" color="secondary">{WORKOUT_SHORT[key]}</Paragraph>
+                  <span css={legendTextStyle}>{WORKOUT_SHORT[key]}</span>
                 </div>
               ))}
           </div>
@@ -133,35 +159,40 @@ export default function Schedule() {
           {/* 날짜 상세 */}
           {selected && (
             <div css={dayDetailStyle}>
-              <Paragraph typography="st5">
-                {new Date(selected.date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
-              </Paragraph>
-              <Spacing size={spacing.xs} />
-              <Badge size="small" variant="weak" color="blue">Week {selected.weekNumber}</Badge>
+              {/* 1행: 날짜 + Week 뱃지 */}
+              <div css={detailRowStyle}>
+                <Paragraph typography="st7">
+                  {new Date(selected.date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+                </Paragraph>
+                <Badge size="small" variant="weak" color="blue">Week {selected.weekNumber}</Badge>
+              </div>
               {selected.workout && selected.workout.workoutType !== 'REST' ? (
                 <>
-                  <Spacing size={spacing.md} />
-                  <div css={workoutTypeLabelStyle(WORKOUT_COLORS[selected.workout.workoutType] ?? '#9E9E9E')}>
-                    <Paragraph typography="st8" css={css`color: #FFFFFF;`}>
-                      {WORKOUT_LABELS[selected.workout.workoutType] ?? selected.workout.workoutType}
+                  {/* 2행: 워크아웃 종류 뱃지 + 거리·페이스 */}
+                  <Spacing size={spacing.sm} />
+                  <div css={detailRowStyle}>
+                    <div css={workoutTypeLabelStyle(WORKOUT_COLORS[selected.workout.workoutType] ?? '#9E9E9E')}>
+                      <Paragraph typography="st8" css={css`color: #FFFFFF;`}>
+                        {WORKOUT_LABELS[selected.workout.workoutType] ?? selected.workout.workoutType}
+                      </Paragraph>
+                    </div>
+                    <Paragraph typography="st8">
+                      {`${selected.workout.distanceKm}km`}
+                      {selected.workout.paceTarget && ` · ${selected.workout.paceTarget}/km`}
                     </Paragraph>
                   </div>
-                  <Spacing size={spacing.sm} />
-                  <Paragraph typography="st6">
-                    {`${selected.workout.distanceKm} km`}
-                    {selected.workout.paceTarget && ` | ${selected.workout.paceTarget}/km`}
-                  </Paragraph>
+                  {/* 3행: 설명 */}
                   {selected.workout.description && (
                     <>
                       <Spacing size={spacing.xs} />
-                      <Paragraph typography="st7" color="secondary">{selected.workout.description}</Paragraph>
+                      <Paragraph typography="st8" color="secondary">{selected.workout.description}</Paragraph>
                     </>
                   )}
                 </>
               ) : (
                 <>
-                  <Spacing size={spacing.sm} />
-                  <Paragraph typography="st7" color="secondary">
+                  <Spacing size={spacing.xs} />
+                  <Paragraph typography="st8" color="secondary">
                     {selected.isTrainingDay ? '휴식' : '훈련 없는 날'}
                   </Paragraph>
                 </>
@@ -170,9 +201,76 @@ export default function Schedule() {
           )}
         </>
       )}
+
+      {/* 광고 확인 팝업 */}
+      {pendingCell && (
+        <div css={overlayStyle} onClick={handleAdCancel}>
+          <div css={dialogStyle} onClick={(e) => e.stopPropagation()}>
+            <Paragraph typography="st6" css={css`text-align: center;`}>
+              짧은 광고 후 일정을 확인할 수 있어요
+            </Paragraph>
+            <Spacing size={spacing.lg} />
+            <div css={dialogBtnRow}>
+              <button css={dialogBtnSecondary} onClick={handleAdCancel}>취소</button>
+              <button css={dialogBtnPrimary} onClick={handleAdConfirm}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const overlayStyle = css`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+`;
+
+const dialogStyle = css`
+  background: ${color.bgCard};
+  border-radius: ${radius.card}px;
+  padding: ${spacing.xl}px;
+  width: 280px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+`;
+
+const dialogBtnRow = css`
+  display: flex;
+  gap: ${spacing.sm}px;
+`;
+
+const dialogBtnSecondary = css`
+  flex: 1;
+  padding: ${spacing.md}px;
+  border: 1px solid ${color.border};
+  border-radius: ${radius.medium}px;
+  background: ${color.bgCard};
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: ${color.textSecondary};
+  cursor: pointer;
+`;
+
+const dialogBtnPrimary = css`
+  flex: 1;
+  padding: ${spacing.md}px;
+  border: none;
+  border-radius: ${radius.medium}px;
+  background: ${color.primary};
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+`;
+
+const schedulePageStyle = css`
+  padding-bottom: 80px;
+`;
 
 const monthNavStyle = css`
   display: flex;
@@ -278,23 +376,35 @@ const calDotStyle = (dotColor: string) => css`
 
 const legendStyle = css`
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: ${spacing.sm}px ${spacing.md}px;
+  gap: ${spacing.xs}px ${spacing.sm}px;
   margin-bottom: ${spacing.lg}px;
 `;
 
 const legendItemStyle = css`
   display: flex;
   align-items: center;
-  gap: ${spacing.xs}px;
+  gap: 2px;
+`;
+
+const legendTextStyle = css`
+  font-size: 0.68rem;
+  color: ${color.textSecondary};
+  white-space: nowrap;
 `;
 
 const legendDotStyle = (dotColor: string) => css`
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background-color: ${dotColor};
+`;
+
+const detailRowStyle = css`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 `;
 
 const dayDetailStyle = css`

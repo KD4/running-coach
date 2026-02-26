@@ -6,7 +6,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'TossProduct', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--adaptiveGrey50, #F9FAFB);
   color: var(--adaptiveGrey900, #191F28);
   line-height: 1.5;

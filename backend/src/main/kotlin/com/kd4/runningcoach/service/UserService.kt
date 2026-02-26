@@ -1,5 +1,6 @@
 package com.kd4.runningcoach.service
 
+import com.kd4.runningcoach.config.AuthInterceptor
 import com.kd4.runningcoach.dto.OnboardingRequest
 import com.kd4.runningcoach.dto.ProfileResponse
 import com.kd4.runningcoach.dto.ProfileUpdateRequest
@@ -16,6 +17,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val userProfileRepository: UserProfileRepository,
     private val scheduleService: ScheduleService,
+    private val authInterceptor: AuthInterceptor,
 ) {
 
     private val log = LoggerFactory.getLogger(UserService::class.java)
@@ -69,6 +71,7 @@ class UserService(
             log.info("[UserService] User not found for provider={}, providerUserId={} (already deleted?)", provider, providerUserId)
             return
         }
+        user.sessionToken?.let { authInterceptor.evictToken(it) }
         userProfileRepository.deleteByUserId(user.id)
         userRepository.delete(user)
         log.info("[UserService] Deleted user id={}, provider={}, providerUserId={}", user.id, provider, providerUserId)
@@ -77,6 +80,7 @@ class UserService(
     @Transactional
     fun deleteUser(userId: Long) {
         val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found") }
+        user.sessionToken?.let { authInterceptor.evictToken(it) }
         userProfileRepository.deleteByUserId(user.id)
         userRepository.delete(user)
         log.info("[UserService] Deleted user id={}", user.id)

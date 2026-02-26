@@ -54,7 +54,7 @@ export default function BottomNav() {
             <div css={navItemInnerStyle}>
               <Asset.Icon
                 frameShape={Asset.frameShape.CleanW24}
-                name="icon-fill-three-dots-mono"
+                name="icon-setting-mono"
                 color={isActive ? adaptive.grey800 : adaptive.grey400}
                 aria-hidden
               />
@@ -65,7 +65,7 @@ export default function BottomNav() {
                 fontWeight="medium"
                 textAlign="center"
               >
-                더보기
+                내정보
               </Text>
             </div>
           )}

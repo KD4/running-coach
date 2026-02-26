@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { TDSMobileAITProvider } from '@toss/tds-mobile-ait'
 import { AuthProvider } from './contexts/AuthContext'
+import { DataCacheProvider } from './contexts/DataCacheContext'
 import './index.css'
 import App from './App'
 
@@ -31,7 +32,9 @@ createRoot(document.getElementById('root')!).render(
       <TDSMobileAITProvider>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <DataCacheProvider>
+              <App />
+            </DataCacheProvider>
           </AuthProvider>
         </BrowserRouter>
       </TDSMobileAITProvider>
