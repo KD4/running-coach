@@ -92,7 +92,7 @@ export default function Schedule() {
     const cell = pendingCell;
     setPendingCell(null);
     if (!cell) return;
-    await showInterstitialAd('ait-ad-test-interstitial-id');
+    await showInterstitialAd(import.meta.env.VITE_AD_INTERSTITIAL_ID ?? 'ait-ad-test-interstitial-id');
     setSelected(cell);
   };
 

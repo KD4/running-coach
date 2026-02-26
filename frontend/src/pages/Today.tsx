@@ -16,7 +16,7 @@ export default function Today() {
   const [error, setError] = useState<string | null>(null);
   const [showDiet, setShowDiet] = useState(false);
   const [showDietTip, setShowDietTip] = useState(false);
-  const bannerRef = useTossBanner('ait-ad-test-banner-id');
+  const bannerRef = useTossBanner(import.meta.env.VITE_AD_BANNER_ID ?? 'ait-ad-test-banner-id');
 
   useEffect(() => {
     if (cached) return;

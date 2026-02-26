@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, updateProfile, getNotificationSetting, updateNotificationSetting } from '../api/user';
-import type { ProfileResponse, NotificationSettingResponse } from '../api/user';
+import type { ProfileResponse } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
 import type { GuestProfile } from '../contexts/AuthContext';
 import { useDataCache } from '../contexts/DataCacheContext';

@@ -49,6 +49,8 @@ class PaceCalculator {
         val arRunKm: Double,
         val intervalSpec: IntervalSpec?,
         val intervalTotalKm: Double,
+        val repetitionSpec: IntervalSpec?,
+        val repetitionTotalKm: Double,
         val phase: String,
         val volumeMultiplier: Double,
     )
@@ -129,7 +131,9 @@ class PaceCalculator {
         val mainWeek = if (isCycleWeek) 0 else week - cycleWeeks  // 1..18 for main, 0 for cycle
 
         val phase = determinePhase(week, totalWeeks)
-        val volumeMultiplier = phaseVolumeMultiplier(phase, if (isCycleWeek) 1 else mainWeek)
+        val baseVolume = phaseVolumeMultiplier(phase, if (isCycleWeek) 1 else mainWeek)
+        val undulating = if (isCycleWeek) 1.0 else undulatingVolumeMultiplier(mainWeek)
+        val volumeMultiplier = baseVolume * undulating
 
         val levelRatio = when (level) {
             Level.BEGINNER -> 0.7
@@ -148,6 +152,10 @@ class PaceCalculator {
         val spec = if (level == Level.BEGINNER) null
                    else getIntervalSpec(distanceWeek, 18, level)
 
+        // R페이스 스펙: BASE_SPEED, CYCLE_SPEED, CYCLE_VO2MAX에서만
+        val repPhases = setOf("BASE_SPEED", "CYCLE_SPEED", "CYCLE_VO2MAX")
+        val repSpec = if (phase in repPhases) getRepetitionSpec(if (isCycleWeek) 5 else mainWeek, level) else null
+
         val baseEasyKm = easyRunKm(goalEvent, distanceWeek)
 
         return WeeklyPlan(
@@ -161,6 +169,8 @@ class PaceCalculator {
             arRunKm = round1(baseEasyKm * 1.2 * levelRatio * volumeMultiplier),
             intervalSpec = spec,
             intervalTotalKm = if (spec != null) round1(spec.totalKm()) else 0.0,
+            repetitionSpec = repSpec,
+            repetitionTotalKm = if (repSpec != null) round1(repSpec.totalKm()) else 0.0,
             phase = phase,
             volumeMultiplier = round1(volumeMultiplier),
         )
@@ -191,7 +201,8 @@ class PaceCalculator {
 
         val mainWeek = week - cycleWeeks
         return when {
-            mainWeek <= 6 -> "BASE"
+            mainWeek <= 3 -> "BASE_FOUNDATION"
+            mainWeek <= 6 -> "BASE_SPEED"
             mainWeek <= 12 -> "DEVELOP"
             mainWeek <= 16 -> "PEAK"
             else -> "TAPER"  // 17-18
@@ -201,6 +212,8 @@ class PaceCalculator {
     private fun phaseVolumeMultiplier(phase: String, mainWeek: Int): Double {
         return when (phase) {
             "BUILD", "BASE" -> 0.8 + (mainWeek - 1) * 0.05
+            "BASE_FOUNDATION" -> 0.8 + (mainWeek - 1) * 0.05
+            "BASE_SPEED" -> 0.8 + (mainWeek - 1) * 0.05
             "DEVELOP" -> 1.0
             "PEAK" -> 1.1
             "RECOVERY" -> 0.7
@@ -208,6 +221,33 @@ class PaceCalculator {
             "CYCLE_RECOVERY" -> 0.7
             "CYCLE_SPEED", "CYCLE_THRESHOLD", "CYCLE_VO2MAX", "CYCLE_RACE_PACE" -> 0.9
             else -> 1.0
+        }
+    }
+
+    private fun undulatingVolumeMultiplier(mainWeek: Int): Double {
+        return when (mainWeek) {
+            4 -> 0.7     // 리커버리 (BASE_SPEED 진입)
+            10 -> 0.7    // 리커버리 (DEVELOP 중간)
+            16 -> 0.8    // 프리테이퍼 (PEAK 마지막)
+            else -> 1.0
+        }
+    }
+
+    fun getRepetitionSpec(mainWeek: Int, level: Level): IntervalSpec? {
+        if (level == Level.BEGINNER) return null
+
+        return when (level) {
+            Level.INTERMEDIATE -> when {
+                mainWeek <= 6 -> IntervalSpec(200, 8, 200)
+                mainWeek <= 10 -> IntervalSpec(200, 10, 200)
+                else -> IntervalSpec(300, 8, 200)
+            }
+            Level.ADVANCED -> when {
+                mainWeek <= 6 -> IntervalSpec(200, 10, 200)
+                mainWeek <= 10 -> IntervalSpec(300, 10, 200)
+                else -> IntervalSpec(400, 8, 200)
+            }
+            else -> null
         }
     }
 

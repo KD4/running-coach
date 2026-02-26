@@ -8,18 +8,20 @@ export const WORKOUT_LABELS: Record<string, string> = {
   RACE: '레이스',
   PACE_RUN: '페이스런',
   ACTIVE_RECOVERY: '회복 조깅',
+  REPETITION: '질주',
 };
 
 export const WORKOUT_COLORS: Record<string, string> = {
+  ACTIVE_RECOVERY: '#78909C',
   EASY: '#4CAF50',
-  AR: '#66BB6A',
+  AR: '#26A69A',
+  REPETITION: '#AB47BC',
   TEMPO: '#FF9800',
   INTERVAL: '#F44336',
   LONG: '#2196F3',
-  REST: '#9E9E9E',
   RACE: '#9C27B0',
+  REST: '#9E9E9E',
   PACE_RUN: '#00BCD4',
-  ACTIVE_RECOVERY: '#78909C',
 };
 
 export const WORKOUT_SHORT: Record<string, string> = {
@@ -32,6 +34,7 @@ export const WORKOUT_SHORT: Record<string, string> = {
   RACE: '레이스',
   PACE_RUN: '페이스',
   ACTIVE_RECOVERY: '회복',
+  REPETITION: '질주',
 };
 
 export const DAYS = [

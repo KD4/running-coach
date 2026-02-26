@@ -161,15 +161,20 @@ class ScheduleService(
         val position = orderedDays.indexOf(todayDow)
         if (position < 0) return null
 
-        val pattern = getPattern(orderedDays.size, weekPlan.level, weekPlan.phase)
+        val cycleWeeks = (totalWeeks - 18).coerceAtLeast(0)
+        val mainWeek = if (currentWeek <= cycleWeeks) 0 else currentWeek - cycleWeeks
+
+        val pattern = getPattern(orderedDays.size, weekPlan.level, weekPlan.phase, mainWeek)
         if (position >= pattern.size) return null
+
+        val easyDescription = if (weekPlan.phase == "BASE_FOUNDATION") "편한 페이스 조깅 (마무리 100m 스트라이드 4회)" else "편한 페이스 조깅"
 
         return when (pattern[position]) {
             "EASY" -> WorkoutDto(
                 workoutType = "EASY",
                 distanceKm = weekPlan.easyRunKm,
                 paceTarget = PaceCalculator.formatPace(vp.ePaceSec),
-                description = "편한 페이스 조깅",
+                description = easyDescription,
             )
             "AR" -> WorkoutDto(
                 workoutType = "AR",
@@ -204,6 +209,37 @@ class ScheduleService(
                     description = "워밍업 2km + 템포 ${"%.1f".format(tempoWork)}km + 쿨다운 1km",
                 )
             }
+            "REPETITION" -> {
+                val repSpec = weekPlan.repetitionSpec!!
+                WorkoutDto(
+                    workoutType = "REPETITION",
+                    distanceKm = weekPlan.repetitionTotalKm,
+                    paceTarget = PaceCalculator.formatPace(vp.rPaceSec),
+                    description = "워밍업 2km + R페이스 ${repSpec.description()} + 쿨다운 1km",
+                )
+            }
+            "COMPOSITE_IT" -> {
+                val spec = weekPlan.intervalSpec!!
+                val tempoWork = (weekPlan.tempoRunKm - 3.0).coerceAtLeast(2.0)
+                val totalKm = weekPlan.intervalTotalKm + tempoWork
+                WorkoutDto(
+                    workoutType = "INTERVAL",
+                    distanceKm = (totalKm * 10).roundToInt() / 10.0,
+                    paceTarget = "${PaceCalculator.formatPace(vp.iPaceSec)} / ${PaceCalculator.formatPace(vp.tPaceSec)}",
+                    description = "워밍업 2km + ${spec.description()} + 템포 ${"%.1f".format(tempoWork)}km + 쿨다운 1km",
+                )
+            }
+            "COMPOSITE_TM" -> {
+                val tempoWork = ((weekPlan.tempoRunKm - 3.0) * 0.6).coerceAtLeast(2.0)
+                val mpWork = ((weekPlan.tempoRunKm - 3.0) * 0.4).coerceAtLeast(2.0)
+                val totalKm = 2.0 + tempoWork + mpWork + 1.0
+                WorkoutDto(
+                    workoutType = "TEMPO",
+                    distanceKm = (totalKm * 10).roundToInt() / 10.0,
+                    paceTarget = "${PaceCalculator.formatPace(vp.tPaceSec)} / ${PaceCalculator.formatPace(vp.mPaceSec)}",
+                    description = "워밍업 2km + 템포 ${"%.1f".format(tempoWork)}km + 마라톤페이스 ${"%.1f".format(mpWork)}km + 쿨다운 1km",
+                )
+            }
             "PACE_RUN" -> WorkoutDto(
                 workoutType = "PACE_RUN",
                 distanceKm = weekPlan.paceRunKm,
@@ -220,7 +256,7 @@ class ScheduleService(
         }
     }
 
-    private fun getPattern(dayCount: Int, level: PaceCalculator.Level, phase: String): List<String> {
+    private fun getPattern(dayCount: Int, level: PaceCalculator.Level, phase: String, mainWeek: Int = 0): List<String> {
         val clamped = dayCount.coerceIn(3, 6)
 
         // 페이즈에 따른 기본 패턴 결정
@@ -249,7 +285,31 @@ class ScheduleService(
                 else -> listOf("EASY", "AR", "EASY", "EASY", "EASY", "EASY")
             }
 
-            // 빌드업/베이스: E 위주 + 레벨에 따라 T/I 도입
+            // Phase I: BASE_FOUNDATION — 이지 중심, 고강도 없음 (모든 레벨 동일)
+            phase == "BASE_FOUNDATION" -> when (clamped) {
+                3 -> listOf("EASY", "AR", "LONG")
+                4 -> listOf("AR", "EASY", "AR", "LONG")
+                5 -> listOf("AR", "EASY", "AR", "EASY", "LONG")
+                else -> listOf("AR", "EASY", "AR", "EASY", "EASY", "LONG")
+            }
+
+            // Phase II: BASE_SPEED — BEGINNER는 FOUNDATION과 동일, INT/ADV는 R페이스 도입
+            phase == "BASE_SPEED" -> when (level) {
+                PaceCalculator.Level.BEGINNER -> when (clamped) {
+                    3 -> listOf("EASY", "AR", "LONG")
+                    4 -> listOf("AR", "EASY", "AR", "LONG")
+                    5 -> listOf("AR", "EASY", "AR", "EASY", "LONG")
+                    else -> listOf("AR", "EASY", "AR", "EASY", "EASY", "LONG")
+                }
+                else -> when (clamped) {
+                    3 -> listOf("AR", "REPETITION", "LONG")
+                    4 -> listOf("AR", "REPETITION", "EASY", "LONG")
+                    5 -> listOf("AR", "REPETITION", "EASY", "AR", "LONG")
+                    else -> listOf("AR", "REPETITION", "EASY", "AR", "EASY", "LONG")
+                }
+            }
+
+            // 기존 BASE (폴백용)
             phase in listOf("BUILD", "BASE") -> when (level) {
                 PaceCalculator.Level.BEGINNER -> when (clamped) {
                     3 -> listOf("EASY", "AR", "LONG")
@@ -271,33 +331,33 @@ class ScheduleService(
                 }
             }
 
-            // 5주 사이클: 포커스별 패턴
+            // 5주 사이클: 포커스별 패턴 (4일+ 보조 강도 추가)
             phase == "CYCLE_SPEED" -> when (clamped) {
                 3 -> listOf("EASY", "INTERVAL", "LONG")
-                4 -> listOf("EASY", "INTERVAL", "EASY", "LONG")
-                5 -> listOf("AR", "INTERVAL", "EASY", "EASY", "LONG")
-                else -> listOf("AR", "INTERVAL", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+                4 -> listOf("EASY", "INTERVAL", "TEMPO", "LONG")
+                5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
             }
             phase == "CYCLE_THRESHOLD" -> when (clamped) {
                 3 -> listOf("EASY", "TEMPO", "LONG")
-                4 -> listOf("EASY", "TEMPO", "EASY", "LONG")
-                5 -> listOf("AR", "TEMPO", "EASY", "EASY", "LONG")
-                else -> listOf("AR", "TEMPO", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+                4 -> listOf("EASY", "TEMPO", "INTERVAL", "LONG")
+                5 -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "LONG")
+                else -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "ACTIVE_RECOVERY", "LONG")
             }
             phase == "CYCLE_VO2MAX" -> when (clamped) {
                 3 -> listOf("EASY", "INTERVAL", "LONG")
-                4 -> listOf("EASY", "INTERVAL", "EASY", "LONG")
-                5 -> listOf("AR", "INTERVAL", "EASY", "EASY", "LONG")
-                else -> listOf("AR", "INTERVAL", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+                4 -> listOf("EASY", "INTERVAL", "REPETITION", "LONG")
+                5 -> listOf("AR", "INTERVAL", "EASY", "REPETITION", "LONG")
+                else -> listOf("AR", "INTERVAL", "EASY", "REPETITION", "ACTIVE_RECOVERY", "LONG")
             }
             phase == "CYCLE_RACE_PACE" -> when (clamped) {
                 3 -> listOf("EASY", "PACE_RUN", "LONG")
-                4 -> listOf("EASY", "PACE_RUN", "EASY", "LONG")
-                5 -> listOf("AR", "PACE_RUN", "EASY", "EASY", "LONG")
-                else -> listOf("AR", "PACE_RUN", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
+                4 -> listOf("EASY", "PACE_RUN", "TEMPO", "LONG")
+                5 -> listOf("AR", "PACE_RUN", "EASY", "TEMPO", "LONG")
+                else -> listOf("AR", "PACE_RUN", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
             }
 
-            // Develop: T 페이스 도입
+            // DEVELOP: 홀짝주 교대 (BEGINNER는 교대 없이 TEMPO 유지)
             phase == "DEVELOP" -> when (level) {
                 PaceCalculator.Level.BEGINNER -> when (clamped) {
                     3 -> listOf("EASY", "TEMPO", "LONG")
@@ -305,21 +365,27 @@ class ScheduleService(
                     5 -> listOf("AR", "EASY", "TEMPO", "EASY", "LONG")
                     else -> listOf("AR", "EASY", "TEMPO", "EASY", "ACTIVE_RECOVERY", "LONG")
                 }
-                PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
-                    3 -> listOf("TEMPO", "EASY", "LONG")
-                    4 -> listOf("AR", "TEMPO", "EASY", "LONG")
-                    5 -> listOf("AR", "TEMPO", "EASY", "EASY", "LONG")
-                    else -> listOf("AR", "TEMPO", "EASY", "EASY", "ACTIVE_RECOVERY", "LONG")
-                }
-                PaceCalculator.Level.ADVANCED -> when (clamped) {
-                    3 -> listOf("TEMPO", "EASY", "LONG")
-                    4 -> listOf("TEMPO", "EASY", "INTERVAL", "LONG")
-                    5 -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "LONG")
-                    else -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "ACTIVE_RECOVERY", "LONG")
+                else -> {
+                    val isOddWeek = mainWeek % 2 == 1  // 홀수주: I 메인 + T 보조
+                    if (isOddWeek) {
+                        when (clamped) {
+                            3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                            4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
+                            5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                            else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                        }
+                    } else {
+                        when (clamped) {
+                            3 -> listOf("TEMPO", "INTERVAL", "LONG")
+                            4 -> listOf("AR", "TEMPO", "INTERVAL", "LONG")
+                            5 -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "LONG")
+                            else -> listOf("AR", "TEMPO", "EASY", "INTERVAL", "ACTIVE_RECOVERY", "LONG")
+                        }
+                    }
                 }
             }
 
-            // Peak: I 인터벌 추가, 고강도
+            // PEAK: 복합 세션 (BEGINNER는 기존 TEMPO+LONG 유지)
             phase == "PEAK" -> when (level) {
                 PaceCalculator.Level.BEGINNER -> when (clamped) {
                     3 -> listOf("EASY", "TEMPO", "LONG")
@@ -327,17 +393,35 @@ class ScheduleService(
                     5 -> listOf("AR", "EASY", "TEMPO", "EASY", "LONG")
                     else -> listOf("AR", "EASY", "TEMPO", "EASY", "ACTIVE_RECOVERY", "LONG")
                 }
-                PaceCalculator.Level.INTERMEDIATE -> when (clamped) {
-                    3 -> listOf("INTERVAL", "TEMPO", "LONG")
-                    4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
-                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
-                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
-                }
-                PaceCalculator.Level.ADVANCED -> when (clamped) {
-                    3 -> listOf("INTERVAL", "TEMPO", "LONG")
-                    4 -> listOf("INTERVAL", "EASY", "TEMPO", "LONG")
-                    5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
-                    else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                else -> when (mainWeek) {
+                    // 13주: COMPOSITE_IT (인터벌 + 템포)
+                    13 -> when (clamped) {
+                        3 -> listOf("COMPOSITE_IT", "EASY", "LONG")
+                        4 -> listOf("AR", "COMPOSITE_IT", "EASY", "LONG")
+                        5 -> listOf("AR", "COMPOSITE_IT", "EASY", "AR", "LONG")
+                        else -> listOf("AR", "COMPOSITE_IT", "EASY", "AR", "ACTIVE_RECOVERY", "LONG")
+                    }
+                    // 14주: COMPOSITE_TM (템포 + 마라톤페이스)
+                    14 -> when (clamped) {
+                        3 -> listOf("COMPOSITE_TM", "EASY", "LONG")
+                        4 -> listOf("AR", "COMPOSITE_TM", "EASY", "LONG")
+                        5 -> listOf("AR", "COMPOSITE_TM", "EASY", "AR", "LONG")
+                        else -> listOf("AR", "COMPOSITE_TM", "EASY", "AR", "ACTIVE_RECOVERY", "LONG")
+                    }
+                    // 15주: COMPOSITE_IT (볼륨 축소 — volumeMultiplier로 처리)
+                    15 -> when (clamped) {
+                        3 -> listOf("COMPOSITE_IT", "EASY", "LONG")
+                        4 -> listOf("AR", "COMPOSITE_IT", "EASY", "LONG")
+                        5 -> listOf("AR", "COMPOSITE_IT", "EASY", "AR", "LONG")
+                        else -> listOf("AR", "COMPOSITE_IT", "EASY", "AR", "ACTIVE_RECOVERY", "LONG")
+                    }
+                    // 16주: 프리테이퍼 — 일반 TEMPO 패턴
+                    else -> when (clamped) {
+                        3 -> listOf("INTERVAL", "TEMPO", "LONG")
+                        4 -> listOf("AR", "INTERVAL", "TEMPO", "LONG")
+                        5 -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "LONG")
+                        else -> listOf("AR", "INTERVAL", "EASY", "TEMPO", "ACTIVE_RECOVERY", "LONG")
+                    }
                 }
             }
 
