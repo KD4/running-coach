@@ -93,7 +93,7 @@ export default function Today() {
             {workout.description && (
               <>
                 <Spacing size={spacing.sm} />
-                <Paragraph typography="st8" color="secondary">{workout.description}</Paragraph>
+                <Paragraph typography="st8" color="secondary" css={css`white-space: pre-line;`}>{workout.description}</Paragraph>
               </>
             )}
           </>

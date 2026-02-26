@@ -18,6 +18,7 @@ class PaceCalculator {
 
     data class VdotPaces(
         val ePaceSec: Int,   // Easy
+        val arPaceSec: Int,  // Aerobic Run (MP + 50)
         val mPaceSec: Int,   // Marathon
         val tPaceSec: Int,   // Threshold
         val iPaceSec: Int,   // Interval
@@ -90,6 +91,7 @@ class PaceCalculator {
         val mp = goalTimeSeconds.toDouble() / raceDistanceKm(goalEvent)
         return VdotPaces(
             ePaceSec = (mp + 75).roundToInt(),   // Easy
+            arPaceSec = (mp + 50).roundToInt(),  // Aerobic Run
             mPaceSec = mp.roundToInt(),           // Marathon
             tPaceSec = (mp - 12).roundToInt(),    // Threshold
             iPaceSec = (mp - 27).roundToInt(),    // Interval

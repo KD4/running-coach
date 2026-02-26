@@ -179,8 +179,8 @@ class ScheduleService(
             "AR" -> WorkoutDto(
                 workoutType = "AR",
                 distanceKm = weekPlan.arRunKm,
-                paceTarget = PaceCalculator.formatPace(vp.ePaceSec),
-                description = "에어로빅 런 ${"%.1f".format(weekPlan.arRunKm)}km - 대화 가능한 편안한 페이스",
+                paceTarget = PaceCalculator.formatPace(vp.arPaceSec),
+                description = "에어로빅 런 ${"%.1f".format(weekPlan.arRunKm)}km\n유산소 기초 훈련",
             )
             "ACTIVE_RECOVERY" -> {
                 val recoveryKm = (weekPlan.easyRunKm * 0.6 * 10).roundToInt() / 10.0

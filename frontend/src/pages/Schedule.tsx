@@ -193,7 +193,7 @@ export default function Schedule() {
                   {selected.workout.description && (
                     <>
                       <Spacing size={spacing.xs} />
-                      <Paragraph typography="st8" color="secondary">{selected.workout.description}</Paragraph>
+                      <Paragraph typography="st8" color="secondary" css={css`white-space: pre-line;`}>{selected.workout.description}</Paragraph>
                     </>
                   )}
                 </>
@@ -214,8 +214,8 @@ export default function Schedule() {
       {pendingCell && (
         <div css={overlayStyle} onClick={handleAdCancel}>
           <div css={dialogStyle} onClick={(e) => e.stopPropagation()}>
-            <Paragraph typography="st6" css={css`text-align: center;`}>
-              짧은 광고 후 일정을 확인할 수 있어요
+            <Paragraph typography="st8" css={css`text-align: center;`}>
+              짧은 광고 후<br />일정을 확인할 수 있어요
             </Paragraph>
             <Spacing size={spacing.lg} />
             <div css={dialogBtnRow}>

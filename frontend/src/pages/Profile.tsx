@@ -5,7 +5,7 @@ import type { ProfileResponse } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
 import type { GuestProfile } from '../contexts/AuthContext';
 import { useDataCache } from '../contexts/DataCacheContext';
-import { List, ListRow, Paragraph, Spacing, Loader, Top, Border } from '@toss/tds-mobile';
+import { List, ListRow, Paragraph, Spacing, Loader, Top, Border, BottomSheet } from '@toss/tds-mobile';
 import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
 import { DAYS, EVENTS, formatTime } from '../constants/workout';
@@ -51,6 +51,7 @@ export default function Profile() {
   const [success, setSuccess] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
+  const [timeSheetOpen, setTimeSheetOpen] = useState(false);
 
   useEffect(() => {
     if (isGuest && guestProfile) {
@@ -247,21 +248,9 @@ export default function Profile() {
                 {notifEnabled && (
                   <ListRow
                     contents={<ListRow.Texts type="1RowTypeA" top="알림 시간" topProps={{ color: adaptive.grey800 }} />}
-                    right={
-                      <div css={timeSelectWrapStyle}>
-                        <select
-                          css={timeSelectStyle}
-                          value={notifHour}
-                          onChange={(e) => handleNotifHourChange(Number(e.target.value))}
-                        >
-                          {Array.from({ length: 17 }, (_, i) => i + 6).map((h) => (
-                            <option key={h} value={h}>
-                              {h < 12 ? `오전 ${h}시` : h === 12 ? '오후 12시' : `오후 ${h - 12}시`}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    }
+                    right={<ListRow.Texts type="Right1RowTypeA" top={formatHourLabel(notifHour)} topProps={{ color: adaptive.grey700 }} />}
+                    arrowType="right"
+                    onClick={() => setTimeSheetOpen(true)}
                     verticalPadding="large"
                   />
                 )}
@@ -306,6 +295,23 @@ export default function Profile() {
         </List>
       </div>
 
+      {/* 알림 시간 BottomSheet */}
+      <BottomSheet
+        open={timeSheetOpen}
+        onDimmerClick={() => setTimeSheetOpen(false)}
+        onClose={() => setTimeSheetOpen(false)}
+        header={<BottomSheet.Header>알림 시간 선택</BottomSheet.Header>}
+      >
+        <BottomSheet.Select
+          options={HOUR_OPTIONS}
+          value={String(notifHour)}
+          onChange={(e) => {
+            handleNotifHourChange(Number(e.target.value));
+            setTimeSheetOpen(false);
+          }}
+        />
+      </BottomSheet>
+
       {/* 편집 모드 - 위자드 오버레이 */}
       {editing && (
         <div css={wizardOverlayStyle}>
@@ -320,6 +326,18 @@ export default function Profile() {
     </>
   );
 }
+
+function formatHourLabel(h: number): string {
+  if (h < 12) return `오전 ${h}시`;
+  if (h === 12) return '오후 12시';
+  return `오후 ${h - 12}시`;
+}
+
+const HOUR_OPTIONS = Array.from({ length: 20 }, (_, i) => i + 4).map((h) => ({
+  name: formatHourLabel(h),
+  label: formatHourLabel(h),
+  value: String(h),
+}));
 
 function QaItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
@@ -432,24 +450,6 @@ const toggleKnobStyle = (on: boolean) => css`
   pointer-events: none;
 `;
 
-const timeSelectWrapStyle = css`
-  display: flex;
-  align-items: center;
-`;
-
-const timeSelectStyle = css`
-  appearance: none;
-  background: none;
-  border: none;
-  font-size: 15px;
-  color: ${adaptive.grey700};
-  cursor: pointer;
-  padding: 4px 20px 4px 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 4px center;
-  text-align: right;
-`;
 
 const wizardOverlayStyle = css`
   position: fixed;
