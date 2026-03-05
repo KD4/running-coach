@@ -2,10 +2,16 @@ import { Outlet } from 'react-router-dom';
 import { css } from '@emotion/react';
 import BottomNav from '../components/BottomNav';
 import { layout } from '../styles/tokens';
+import { useBackEvent } from '../hooks/useBackEvent';
+import { useExitConfirm } from '../hooks/useExitConfirm';
 
 export default function MainLayout() {
+  const { openExitDialog, ExitConfirmDialog } = useExitConfirm();
+  useBackEvent(openExitDialog);
+
   return (
     <div css={appLayoutStyle}>
+      <ExitConfirmDialog />
       <main css={appMainStyle}>
         <Outlet />
       </main>

@@ -35,8 +35,8 @@ class UserProfile(
     var targetWeight: Double? = null,
 
     @Column(nullable = false)
-    var notificationEnabled: Boolean = false,
+    var notificationEnabled: Boolean = true,
 
     @Column(nullable = false)
-    var notificationHour: Int = 7,
+    var notificationHour: Int = 8,
 )

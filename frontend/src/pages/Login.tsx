@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { appLogin } from '@apps-in-toss/web-bridge';
 import { oauthLogin } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
+import { useBackEvent } from '../hooks/useBackEvent';
+import { useExitConfirm } from '../hooks/useExitConfirm';
 import { Asset, Top, StepperRow, Spacing, Paragraph, Button } from '@toss/tds-mobile';
 import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
@@ -12,6 +14,9 @@ export default function Login() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { openExitDialog, ExitConfirmDialog } = useExitConfirm();
+  useBackEvent(openExitDialog);
 
   const handleTossLogin = async () => {
     setLoading(true);
@@ -30,6 +35,7 @@ export default function Login() {
 
   return (
     <>
+      <ExitConfirmDialog />
       <Spacing size={12} />
       <Top
         title={

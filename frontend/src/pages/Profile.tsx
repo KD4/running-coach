@@ -49,8 +49,8 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [notifEnabled, setNotifEnabled] = useState(false);
-  const [notifHour, setNotifHour] = useState(7);
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [notifHour, setNotifHour] = useState(8);
   const [timeSheetOpen, setTimeSheetOpen] = useState(false);
 
   useEffect(() => {

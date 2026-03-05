@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { appLogin } from '@apps-in-toss/web-bridge';
 import { oauthLogin } from '../api/auth';
 import { submitOnboarding } from '../api/user';
 import { useAuth } from '../contexts/AuthContext';
+import { useBackEvent } from '../hooks/useBackEvent';
+import { useExitConfirm } from '../hooks/useExitConfirm';
 import { Asset, Top, StepperRow, Spacing, Paragraph, Button } from '@toss/tds-mobile';
 import { adaptive } from '@toss/tds-colors';
 import { css } from '@emotion/react';
@@ -17,6 +19,17 @@ export default function Onboarding() {
   const [showIntro, setShowIntro] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  const { openExitDialog, ExitConfirmDialog } = useExitConfirm();
+
+  // 인트로 화면: 종료 확인 다이얼로그, 위자드 화면: 인트로로 돌아감
+  useBackEvent(useCallback(() => {
+    if (showIntro) {
+      openExitDialog();
+    } else {
+      setShowIntro(true);
+    }
+  }, [showIntro, openExitDialog]));
 
   /* ─── 인트로: 로그인 ─── */
 
@@ -73,6 +86,7 @@ export default function Onboarding() {
   if (showIntro) {
     return (
       <>
+        <ExitConfirmDialog />
         <Spacing size={12} />
         <Top
           title={
