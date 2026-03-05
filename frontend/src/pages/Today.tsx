@@ -190,6 +190,10 @@ export default function Today() {
                   <Paragraph typography="st8" color="secondary">남은 기간</Paragraph>
                   <Paragraph typography="st8">{`D-${data.calories.dietDaysRemaining}`}</Paragraph>
                 </div>
+                <Spacing size={spacing.xs} />
+                <Paragraph typography="st8" color="secondary" css={css`font-size: 0.7rem; text-align: center;`}>
+                  대회 7일 전 감량을 종료하고 에너지를 비축하세요
+                </Paragraph>
               </div>
             )}
           </>
