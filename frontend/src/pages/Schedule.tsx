@@ -77,8 +77,10 @@ export default function Schedule() {
   };
 
   const [pendingCell, setPendingCell] = useState<ScheduleDayDto | null>(null);
+  const [adLoading, setAdLoading] = useState(false);
 
   const handleDayClick = (cell: ScheduleDayDto) => {
+    if (adLoading) return;
     // TTL 내면 광고 스킵 → 바로 상세
     if (!showInterstitialAd.shouldShow()) {
       setSelected(cell);
@@ -92,8 +94,13 @@ export default function Schedule() {
     const cell = pendingCell;
     setPendingCell(null);
     if (!cell) return;
-    await showInterstitialAd(import.meta.env.VITE_AD_INTERSTITIAL_ID ?? 'ait-ad-test-interstitial-id');
-    setSelected(cell);
+    setAdLoading(true);
+    try {
+      await showInterstitialAd(import.meta.env.VITE_AD_INTERSTITIAL_ID ?? 'ait-ad-test-interstitial-id');
+      setSelected(cell);
+    } finally {
+      setAdLoading(false);
+    }
   };
 
   const handleAdCancel = () => {
@@ -210,6 +217,17 @@ export default function Schedule() {
         </>
       )}
 
+      {/* 광고 로딩 오버레이 */}
+      {adLoading && (
+        <div css={overlayStyle}>
+          <div css={adLoadingBoxStyle}>
+            <Loader />
+            <Spacing size={spacing.md} />
+            <Paragraph typography="st8" color="secondary">광고를 불러오는 중...</Paragraph>
+          </div>
+        </div>
+      )}
+
       {/* 광고 확인 팝업 */}
       {pendingCell && (
         <div css={overlayStyle} onClick={handleAdCancel}>
@@ -237,6 +255,12 @@ const overlayStyle = css`
   align-items: center;
   justify-content: center;
   z-index: 200;
+`;
+
+const adLoadingBoxStyle = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 `;
 
 const dialogStyle = css`

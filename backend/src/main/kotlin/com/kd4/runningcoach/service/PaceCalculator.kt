@@ -164,7 +164,7 @@ class PaceCalculator {
             weekNumber = week,
             vdotPaces = vdotPaces,
             level = level,
-            longRunKm = round1(longRunKm(goalEvent, distanceWeek, 18) * longRunRatio * volumeMultiplier),
+            longRunKm = round1(min(longRunKm(goalEvent, distanceWeek, 18) * longRunRatio * volumeMultiplier, longRunMaxKm(goalEvent))),
             easyRunKm = round1(baseEasyKm * levelRatio * volumeMultiplier),
             tempoRunKm = round1(tempoRunKm(goalEvent, distanceWeek) * levelRatio * volumeMultiplier),
             paceRunKm = round1(tempoRunKm(goalEvent, distanceWeek) * levelRatio * volumeMultiplier),
@@ -277,6 +277,14 @@ class PaceCalculator {
             }
             else -> IntervalSpec(400, 4, 200)
         }
+    }
+
+    /** multiplier 적용 후에도 넘지 않을 최종 상한 */
+    private fun longRunMaxKm(goalEvent: String): Double = when (goalEvent) {
+        "10K" -> 14.0
+        "HALF" -> 24.0
+        "MARATHON" -> 35.0
+        else -> 35.0
     }
 
     // --- Long Run Distance (taper handled by volumeMultiplier externally) ---
