@@ -7,5 +7,6 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/build/libs/app.jar app.jar
 ENTRYPOINT ["java", \
+  "-Duser.timezone=Asia/Seoul", \
   "-XX:MaxRAMPercentage=75.0", \
   "-jar", "app.jar"]
