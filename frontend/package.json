@@ -5,19 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "granite dev",
-    "build": "granite build",
+    "build": "ait build",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "ait deploy"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "^1.14.0",
+    "@apps-in-toss/web-framework": "^2.0.1",
     "@emotion/react": "^11.14.0",
     "@toss/tds-mobile": "^2.2.1",
     "@toss/tds-mobile-ait": "^2.2.1",
     "axios": "^1.13.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "react-router-dom": "^7.13.0"
   },
   "devDependencies": {

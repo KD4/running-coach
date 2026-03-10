@@ -38,14 +38,14 @@ class TossMessageService(
             "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/messenger/send-message"
     }
 
-    fun sendMessage(userKey: String) {
+    fun sendMessage(userKey: String, workoutType: String) {
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
             set("X-Toss-User-Key", userKey)
         }
         val body = mapOf(
             "templateSetCode" to templateSetCode,
-            "context" to emptyMap<String, Any>(),
+            "context" to mapOf("workoutType" to workoutType),
         )
 
         try {
