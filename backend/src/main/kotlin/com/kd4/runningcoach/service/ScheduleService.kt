@@ -59,6 +59,17 @@ class ScheduleService(
     // === 핵심 계산 로직 (ProfileData 기반) ===
 
     private fun calculateToday(data: ProfileData, date: LocalDate): TodayResponse {
+        if (date.isAfter(data.targetDate)) {
+            return TodayResponse(
+                date = date,
+                weekNumber = 0,
+                totalWeeks = 0,
+                workout = null,
+                calories = calculateCalories(data.bodyWeight, 0.0, null, 0.0, null, data.targetWeight, data.targetDate, date),
+                isRestDay = true,
+            )
+        }
+
         val planSelection = paceCalculator.determinePlanType(data.targetDate, date)
         val totalWeeks = planSelection.totalWeeks
         val currentWeek = planSelection.currentWeek

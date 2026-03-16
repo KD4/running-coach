@@ -74,9 +74,14 @@ class NotificationScheduler(
     }
 
     private fun resolveWorkoutTypeKo(userId: Long, date: LocalDate): String {
-        val todayResponse = scheduleService.getToday(userId, date)
-        if (todayResponse.isRestDay) return "휴식"
-        val type = todayResponse.workout?.workoutType ?: return "휴식"
-        return WORKOUT_TYPE_KO[type] ?: type
+        return try {
+            val todayResponse = scheduleService.getToday(userId, date)
+            if (todayResponse.isRestDay) return "휴식"
+            val type = todayResponse.workout?.workoutType ?: return "휴식"
+            WORKOUT_TYPE_KO[type] ?: type
+        } catch (e: Exception) {
+            log.info("[NotificationScheduler] No schedule for user id={}, defaulting to 휴식: {}", userId, e.message)
+            "휴식"
+        }
     }
 }
