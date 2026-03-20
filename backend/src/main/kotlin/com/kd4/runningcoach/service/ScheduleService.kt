@@ -6,6 +6,7 @@ import com.kd4.runningcoach.repository.UserProfileRepository
 import org.springframework.stereotype.Service
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -28,7 +29,7 @@ class ScheduleService(
         .build<Long, UserCacheEntry>()
 
     // --- 로그인 유저용 ---
-    fun getToday(userId: Long, date: LocalDate = LocalDate.now()): TodayResponse {
+    fun getToday(userId: Long, date: LocalDate = LocalDate.now(ZoneId.of("Asia/Seoul"))): TodayResponse {
         val entry = userCache.get(userId) { UserCacheEntry() }!!
         return entry.today.getOrPut(date) {
             calculateToday(getProfileData(userId), date)
@@ -48,7 +49,7 @@ class ScheduleService(
     }
 
     // --- 게스트용 ---
-    fun getTodayGuest(data: ProfileData, date: LocalDate = LocalDate.now()): TodayResponse {
+    fun getTodayGuest(data: ProfileData, date: LocalDate = LocalDate.now(ZoneId.of("Asia/Seoul"))): TodayResponse {
         return calculateToday(data, date)
     }
 

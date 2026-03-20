@@ -4,6 +4,7 @@ COPY . .
 RUN gradle bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre
+ENV TZ=Asia/Seoul
 WORKDIR /app
 COPY --from=build /app/build/libs/app.jar app.jar
 ENTRYPOINT ["java", \
